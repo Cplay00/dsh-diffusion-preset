@@ -106,6 +106,59 @@ test('unknown MCP and plugin families are independently discoverable', async t =
   assert(!h.visible(agent).includes('other_fetch'));
 });
 
+for (const mode of ['native', 'ptc']) {
+  test(`${mode}: broad lookups paginate a shared tool/skill budget without mounting`, async t => {
+    const h = harness(t, { mode }, { names: [...Array.from({ length: 40 }, (_, i) => `vendor_read_${String(i).padStart(2, '0')}`), 'read'] });
+    for (let i = 0; i < 20; i++) h.skillDefs.set(`read-skill-${i}`, { name: `read-skill-${i}`, description: 'Read workflow' });
+    const skillLoads = t.mock.method(h.ctx.skills, 'get');
+    const agent = h.agent();
+    const before = h.visible(agent);
+    const first = await h.call(agent, { query: 'read', names: ['*'], action: 'lookup' });
+    const candidates = report => [...report.matchAll(/^- `([^`]+)` \[(?:Locked|Unlocked|Skill)\]/gm)].map(m => m[1]);
+    assert.equal(first.stage, 'lookup');
+    assert.deepEqual(first.unlocked, []);
+    assert.match(first.report, /\*\*41\*\* tools, \*\*20\*\* skills/);
+    assert.equal(candidates(first.report).length, 5);
+    assert.equal(candidates(first.report)[0], 'read', 'exact name must precede broad matches');
+    assert.match(first.report, /"offset":5/);
+    assert.doesNotMatch(first.report, /unlock the entire group|Command Parameter Schema|names: \["core:/);
+    assert.deepEqual(h.visible(agent), before);
+    const second = await h.call(agent, { query: 'read', offset: 5 });
+    assert.equal(candidates(second.report).length, 5);
+    assert(!candidates(second.report).some(name => candidates(first.report).includes(name)));
+    const all = [];
+    for (let offset = 0; offset < 61; offset += 10) all.push(...candidates((await h.call(agent, { query: 'read', offset, limit: 10 })).report));
+    assert.equal(all.length, 61);
+    assert.equal(new Set(all).size, 61, 'pagination must not duplicate or hide skills');
+    assert.equal(skillLoads.mock.calls.length, 0, 'lookup must not fetch skill bodies');
+    assert.deepEqual(h.visible(agent), before);
+    await h.call(agent, { names: ['read'] });
+    assert.deepEqual(h.visible(agent).filter(name => !before.includes(name)), ['read']);
+  });
+}
+
+test('lookup pagination rejects invalid budgets and handles an exhausted page', async t => {
+  const h = harness(t);
+  const agent = h.agent();
+  for (const args of [{ limit: 0 }, { limit: 11 }, { limit: 1.5 }, { offset: -1 }, { offset: 0.5 }]) {
+    await assert.rejects(h.call(agent, { action: 'lookup', ...args }), /Lookup pagination/);
+  }
+  const result = await h.call(agent, { query: 'read', offset: 99 });
+  assert.match(result.report, /No items on this page/);
+  assert.doesNotMatch(result.report, /Mount Directly/);
+  assert.deepEqual(result.unlocked, []);
+});
+
+test('search keywords and unqualified category suffixes never mount whole families', async t => {
+  const h = harness(t, {}, { names: Array.from({ length: 40 }, (_, i) => `mcp__vendor__read_${i}`) });
+  const agent = h.agent();
+  const before = h.visible(agent);
+  assert.deepEqual((await h.call(agent, { action: 'detail', query: 'mcp:vendor' })).unlocked, []);
+  assert.deepEqual((await h.call(agent, { names: ['vendor'] })).unlocked, []);
+  assert.deepEqual(h.visible(agent), before);
+  assert.equal((await h.call(agent, { names: ['mcp:vendor'] })).unlocked.length, 40, 'qualified category expansion must remain explicit and available');
+});
+
 test('rendered inventory advertises only registered initial tools and available categories', async t => {
   const h = harness(t, {}, { names: ['custom_shell'], mount: false });
   const inv = await buildCompleteInventory(h.ctx);

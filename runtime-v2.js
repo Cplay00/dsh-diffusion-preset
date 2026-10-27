@@ -338,7 +338,11 @@ export function apply(ctx, config = {}) {
 
   /** Stage 2: Lookup specific names and descriptions by category and/or keyword query. */
   function renderLookupStage(inventory, args) {
-    const { allToolsMap, skills, categories } = inventory;
+    const { allToolsMap, skills } = inventory;
+    const { offset = 0, limit = 5 } = args;
+    if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 10) {
+      throw new RangeError('Lookup pagination requires offset >= 0 and limit between 1 and 10, both integers.');
+    }
     let rawCat = (args.category ?? '').trim().toLowerCase();
     if (CATEGORY_ALIASES[rawCat]) rawCat = CATEGORY_ALIASES[rawCat].toLowerCase();
     const rawQuery = (args.query ?? '').trim().toLowerCase();
@@ -376,10 +380,19 @@ export function apply(ctx, config = {}) {
       }
     }
 
+    const rank = item => item.name.toLowerCase() === rawQuery ? 0
+      : rawQuery && item.name.toLowerCase().startsWith(rawQuery) ? 1 : 2;
+    const matches = [
+      ...matchedTools.map(item => ({ ...item, kind: 'tool' })),
+      ...matchedSkills.map(item => ({ ...item, kind: 'skill' })),
+    ].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name) || a.kind.localeCompare(b.kind));
+    const page = matches.slice(offset, offset + limit);
+
     const lines = [
       `# Call Directory · Lookup Results`,
       `- Search Criteria: category=\`${args.category || 'all'}\`, query=\`${args.query || '(none)'}\``,
       `- Matches: **${matchedTools.length}** tools, **${matchedSkills.length}** skills`,
+      '- Lookup only: no tools or skills were mounted.',
       ...inventory.warnings.map(warning => `⚠️ ${warning}`),
     ];
 
@@ -393,40 +406,28 @@ export function apply(ctx, config = {}) {
       return lines.join('\n');
     }
 
-    if (matchedTools.length > 0) {
-      lines.push('', '## Matching Tools / MCP / Plugins (Tools)');
-      const byCat = new Map();
-      for (const t of matchedTools) {
-        if (!byCat.has(t.category)) byCat.set(t.category, []);
-        byCat.get(t.category).push(t);
-      }
-      for (const [catId, list] of byCat.entries()) {
-        const catTitle = categories.get(catId)?.title ?? catId;
-        lines.push('', `### [${catId}] ${catTitle} (${list.length})`);
-        for (const t of list) {
-          const badge = t.unlocked ? '[Unlocked]' : '[Locked]';
-          lines.push(`- \`${t.name}\` ${badge}: ${firstLineSummary(t.description, 160)}`);
-        }
-      }
+    if (page.length === 0) {
+      lines.push('', 'No items on this page. Retry with offset: 0 or a smaller offset.');
+      return lines.join('\n');
     }
 
-    if (matchedSkills.length > 0) {
-      lines.push('', `## Matching Domain Skills (Skills, ${matchedSkills.length} total)`);
-      for (const s of matchedSkills) {
-        lines.push(`- \`${s.name}\` [Skill]: ${firstLineSummary(s.description, 180)}`);
-      }
+    lines.push(`- Showing ${offset + 1}-${offset + page.length} of ${matches.length} matches.`, '', '## Candidates');
+    for (const item of page) {
+      const badge = item.kind === 'skill' ? '[Skill]' : item.unlocked ? '[Unlocked]' : '[Locked]';
+      lines.push(`- \`${item.name}\` ${badge} (${item.category ?? 'skills'}): ${firstLineSummary(item.description, 120)}`);
     }
 
-    const sampleTargets = [
-      ...matchedTools.slice(0, 3).map(t => JSON.stringify(t.name)),
-      ...matchedSkills.slice(0, 2).map(s => JSON.stringify(s.name)),
-    ].slice(0, 3);
+    if (offset + page.length < matches.length) {
+      const nextPage = { action: 'lookup', ...(args.category ? { category: args.category } : {}), ...(args.query ? { query: args.query } : {}), offset: offset + limit, limit };
+      lines.push('', `- Next page (lookup only): \`call_directory(${JSON.stringify(nextPage)})\`.`);
+    }
 
+    const target = page[0].kind === 'skill' ? `skill:${page[0].name}` : page[0].name;
     lines.push(
       '',
       '## Next Step: Mount Directly',
-      `- Call \`call_directory({ names: [${sampleTargets.join(', ') || '"<name>"'}] })\` to mount immediately.`,
-      `- Or pass a category ID (e.g. \`names: ["${matchedTools[0]?.category ?? 'core:file'}"]\`) to unlock the entire group.`
+      `- Select only the exact capability needed, e.g. \`call_directory({ names: [${JSON.stringify(target)}] })\`.`,
+      '- Search results are candidates, not a batch mount request.'
     );
 
     return lines.join('\n');
@@ -442,8 +443,8 @@ export function apply(ctx, config = {}) {
     if (typeof args.category === 'string' && args.category.trim()) {
       requestedTokens.push(args.category.trim());
     }
-    if (requestedTokens.length === 0 && typeof args.query === 'string' && args.query.trim()) {
-      requestedTokens.push(args.query.trim());
+    if (requestedTokens.length === 0) {
+      return { text: '# Call Directory · Mount Results\n\nNo tools mounted. Supply exact names or an explicit category to mount; query is for lookup only.', unlocked: [], loadedSkills: [] };
     }
 
     const toolsToUnlock = new Set();
@@ -501,15 +502,6 @@ export function apply(ctx, config = {}) {
 
       const prefix = resolved.endsWith('*') ? resolved.slice(0, -1) : resolved;
       let matchedAny = false;
-
-      for (const [catId, cat] of categories.entries()) {
-        if (catId === prefix || catId.endsWith(`:${prefix}`)) {
-          for (const t of cat.tools) {
-            toolsToUnlock.add(t.name);
-            matchedAny = true;
-          }
-        }
-      }
 
       for (const tName of allToolNames) {
         const tLower = tName.toLowerCase();
@@ -774,6 +766,14 @@ export function apply(ctx, config = {}) {
           description:
             'Search keyword (case-insensitive, matched against tool names, skill names, MCP server names, and descriptions).',
         },
+        offset: {
+          type: 'integer', minimum: 0,
+          description: 'Lookup only: zero-based result offset. Defaults to 0. Does not mount capabilities.',
+        },
+        limit: {
+          type: 'integer', minimum: 1, maximum: 10,
+          description: 'Lookup only: combined tool and skill candidates per page. Defaults to 5; maximum 10. No parameter schemas or skill bodies are loaded.',
+        },
         names: {
           description:
             'Specific name(s) or alias to mount or unload (array or comma-separated string; e.g. "read", "docx", category alias like "fs", or "*" for full unlock).',
@@ -888,7 +888,7 @@ export function apply(ctx, config = {}) {
         '   - Inspect available categories with `call_directory()` before selecting a tool or category name.',
         '   - 🎨 Domain Tasks & Skills: Search via `call_directory({ query: "keyword" })` for relevant registered skills',
         '   - 🚀 Full Standard Mode: `call_directory({ names: ["*"] })` to expand all tools',
-        '2. **Explore & Search**: Overview categories with `call_directory()`; search tools or skills by category or keyword with `call_directory({ query: "..." })`.',
+        '2. **Explore & Search**: `call_directory({ query: "..." })` only lists candidates (5 per page, at most 10). Use offset to page; then mount only needed exact names. Lookup never mounts tools or loads skill bodies.',
         '3. **Dynamic Pruning (Unload)**: Remove tool definitions from subsequent requests with `call_directory({ action: "unload", names: [...] })` or `{ action: "reset" }`. Existing conversation history is retained.',
       ].join('\n'),
   });
