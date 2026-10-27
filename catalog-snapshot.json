@@ -1,0 +1,120 @@
+{
+  "updatedAt": "2026-10-27T03:21:42.982Z",
+  "toolCount": 15,
+  "skillCount": 2,
+  "categories": [
+    {
+      "id": "core:file",
+      "kind": "core",
+      "title": "文件读写与代码搜索 (Core File & Search)",
+      "summary": "读取、创建、精确编辑文本文件，按路径通配符 (glob) 或正则内容 (grep) 搜索代码，以及切换工作目录。",
+      "tools": [
+        {
+          "name": "read",
+          "description": "Read file"
+        },
+        {
+          "name": "write",
+          "description": "Write file"
+        },
+        {
+          "name": "edit",
+          "description": "Edit file"
+        },
+        {
+          "name": "glob",
+          "description": "Glob files"
+        },
+        {
+          "name": "grep",
+          "description": "Grep files"
+        },
+        {
+          "name": "working_directory",
+          "description": "Change directory"
+        },
+        {
+          "name": "ops_read_files",
+          "description": "Read files batch"
+        },
+        {
+          "name": "ops_discover_tools",
+          "description": "Discover tools"
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "core:subagent",
+      "kind": "core",
+      "title": "子智能体委派、工作流与团队协作 (Subagent, Workflow & Team)",
+      "summary": "派发独立或继承上下文的子智能体 (subagent / subagent_fork)、运行并发编排脚本 (workflow)、Ralph 迭代循环及多智能体团队协作。",
+      "tools": [
+        {
+          "name": "subagent",
+          "description": "Spawn subagent"
+        },
+        {
+          "name": "subagent_fork",
+          "description": "Fork subagent"
+        },
+        {
+          "name": "send_message",
+          "description": "Send message"
+        },
+        {
+          "name": "interrupt_agent",
+          "description": "Interrupt agent"
+        },
+        {
+          "name": "list_agents",
+          "description": "List agents"
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "core:task",
+      "kind": "core",
+      "title": "任务规划、长程目标、澄清提问与后台作业 (Task, Goal, Question, Jobs & Schedule)",
+      "summary": "管理多步任务清单 (todo_write)、向用户提问确认 (ask_user_question)、提交规划审批 (exit_plan_mode)、长程目标 (goal) 与后台任务/定时提醒。",
+      "tools": [
+        {
+          "name": "todo_write",
+          "description": "Update task list"
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "skills",
+      "kind": "skill",
+      "title": "专业领域技能库 (Skills)",
+      "summary": "按需加载特定领域的完整工作流、脚本规范与最佳实践指令（涵盖 Office/Univer/设计/浏览器控制/逆向/搜索调研/插件开发/飞牛OS/记忆等）。",
+      "tools": [],
+      "skills": [
+        {
+          "name": "docx",
+          "description": "Word document automation"
+        },
+        {
+          "name": "ppt-master",
+          "description": "Presentation generator"
+        }
+      ]
+    },
+    {
+      "id": "mcp:rea",
+      "kind": "mcp",
+      "title": "MCP 服务: rea",
+      "summary": "Reverse Engineer Anything (REA) 逆向工程：二进制 (ELF/PE/Mach-O/APK/WASM/固件)、JS 包与浏览器运行时的静态/动态分析。",
+      "tools": [
+        {
+          "name": "mcp__rea__disasm",
+          "description": "REA disassembler"
+        }
+      ],
+      "skills": []
+    }
+  ]
+}

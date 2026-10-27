@@ -1,0 +1,161 @@
+{
+  "updatedAt": "2026-10-27T03:04:25.142Z",
+  "presets": [
+    {
+      "id": "standard",
+      "order": 1
+    },
+    {
+      "id": "ptc",
+      "order": 2
+    },
+    {
+      "id": "minimal",
+      "order": 3
+    },
+    {
+      "id": "cordis",
+      "order": 4
+    },
+    {
+      "id": "diffusion",
+      "name": "扩散模式",
+      "description": "从极简模式起步，通过“调用目录 → 名称 → 详细命令”按需解锁工具、技能、MCP 与插件，最终完整展开为标准模式。",
+      "order": 5
+    },
+    {
+      "id": "diffusion-ptc",
+      "name": "扩散模式 (PTC)",
+      "description": "从极简模式起步，通过“调用目录 → 名称 → 详细命令”按需解锁 SDK 绑定、技能、MCP 与插件，最终完整展开为 PTC 模式。",
+      "order": 6
+    }
+  ],
+  "selfTest": {
+    "diffusion": {
+      "ok": true,
+      "initialWireTools": [
+        "call_directory",
+        "pwsh",
+        "read_image"
+      ],
+      "initialCallableSurface": [
+        "call_directory",
+        "pwsh",
+        "read_image"
+      ],
+      "catalogStageOk": true,
+      "lookupSubagentOk": true,
+      "lookupSkillOk": true,
+      "selectiveUnlock": {
+        "unlockedTools": [
+          "read",
+          "subagent_fork",
+          "subagent",
+          "send_message",
+          "interrupt_agent",
+          "list_agents",
+          "spawn_teammate",
+          "wait_agent",
+          "team_task_create",
+          "team_task_get",
+          "team_task_list",
+          "team_task_update"
+        ],
+        "loadedSkills": [],
+        "hasDocxSkillContent": false,
+        "callableCountAfterSelective": 8,
+        "callableToolsAfterSelective": [
+          "call_directory",
+          "read",
+          "pwsh",
+          "read_image",
+          "send_message",
+          "interrupt_agent",
+          "list_agents",
+          "subagent_fork"
+        ]
+      },
+      "fullUnlock": {
+        "callableCountAfterFullUnlock": 363
+      }
+    },
+    "diffusion-ptc": {
+      "ok": true,
+      "initialWireTools": [
+        "run_code"
+      ],
+      "initialCallableSurface": [
+        "call_directory",
+        "pwsh",
+        "read_image"
+      ],
+      "catalogStageOk": true,
+      "lookupSubagentOk": true,
+      "lookupSkillOk": true,
+      "selectiveUnlock": {
+        "unlockedTools": [
+          "read",
+          "subagent_fork",
+          "subagent",
+          "send_message",
+          "interrupt_agent",
+          "list_agents",
+          "spawn_teammate",
+          "wait_agent",
+          "team_task_create",
+          "team_task_get",
+          "team_task_list",
+          "team_task_update"
+        ],
+        "loadedSkills": [],
+        "hasDocxSkillContent": false,
+        "callableCountAfterSelective": 8,
+        "callableToolsAfterSelective": [
+          "call_directory",
+          "read",
+          "pwsh",
+          "read_image",
+          "send_message",
+          "interrupt_agent",
+          "list_agents",
+          "subagent_fork"
+        ]
+      },
+      "fullUnlock": {
+        "callableCountAfterFullUnlock": 362
+      }
+    }
+  },
+  "compositions": [
+    {
+      "id": "minimal",
+      "moduleCount": 7,
+      "leakedServices": []
+    },
+    {
+      "id": "ptc",
+      "moduleCount": 25,
+      "leakedServices": []
+    },
+    {
+      "id": "standard",
+      "moduleCount": 26,
+      "leakedServices": []
+    },
+    {
+      "id": "cordis",
+      "moduleCount": 29,
+      "leakedServices": []
+    },
+    {
+      "id": "diffusion-ptc",
+      "moduleCount": 29,
+      "leakedServices": []
+    },
+    {
+      "id": "diffusion",
+      "moduleCount": 30,
+      "leakedServices": []
+    }
+  ]
+}

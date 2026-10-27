@@ -1,0 +1,72 @@
+{
+  "name": "dsh-diffusion-preset",
+  "version": "1.1.0",
+  "type": "module",
+  "description": "Diffusion Mode (扩散模式) agent preset and progressive call directory tool for DeepSeek Harness.",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "preset",
+    "diffusion",
+    "tools",
+    "workflow",
+    "progressive-disclosure"
+  ],
+  "author": {
+    "name": "Cplay00",
+    "url": "https://github.com/Cplay00"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Cplay00/dsh-diffusion-preset.git"
+  },
+  "homepage": "https://github.com/Cplay00/dsh-diffusion-preset#readme",
+  "bugs": {
+    "url": "https://github.com/Cplay00/dsh-diffusion-preset/issues"
+  },
+  "license": "MIT",
+  "scripts": {
+    "test": "node test-e2e-iteration.js",
+    "sync": "node sync-catalog.js"
+  },
+  "icon": "./icon.svg",
+  "exports": {
+    ".": "./index.js",
+    "./catalog-builder": "./catalog-builder.js",
+    "./runtime": "./runtime.js",
+    "./runtime-v2": "./runtime-v2.js",
+    "./runtime-v2/locale/*.json": "./locale/*.json",
+    "./runtime-v2/icon": "./icon.svg",
+    "./runtime/locale/*.json": "./locale/*.json",
+    "./runtime/icon": "./icon.svg",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "runtime.js",
+    "runtime-v2.js",
+    "catalog-builder.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "assets/*",
+    "screenshots.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    }
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}
