@@ -450,14 +450,13 @@ export function firstLineSummary(text, maxLen = 140) {
 }
 
 /** Recommend scenario-based shortcuts and installed categories in this inventory. */
-export function quickUnlockLines(inventory, { isPtcMode = false } = {}) {
-  const first = [...inventory.allToolsMap.values()].find(tool => tool.category !== 'initial');
+export function quickUnlockLines(_inventory, { isPtcMode = false } = {}) {
   const call = isPtcMode ? 'await tools.call_directory' : 'call_directory';
   return [
-    ...(isPtcMode ? ['- Run these SDK snippets inside `run_code`; use newly mounted bindings in the next `run_code`.'] : []),
-    `- Search a concrete operation with \`${call}({ query: "<operation>" })\`; lookup never mounts capabilities.`,
-    ...(first ? [`- Mount only the selected name, e.g. \`${call}({ names: [${JSON.stringify(first.name)}] })\`.`] : []),
-    `- Browse a category with \`${call}({ category: "<category id>" })\` before selecting exact names.`,
+    isPtcMode ? '- Run these SDK snippets inside `run_code`; use newly mounted bindings in the next `run_code`.' : '- These are native tool-call examples; send JSON arguments to the named tool, not to a shell or JavaScript runtime.',
+    `- Search a concrete operation with \`${call}({ action: "lookup", query: "<operation>" })\`; lookup never mounts capabilities.`,
+    `- After selecting a matching candidate, mount its exact name with \`${call}({ action: "detail", names: ["<selected name>"] })\`. Replace placeholders; mounting does not execute the target.`,
+    `- Browse a category with \`${call}({ action: "lookup", category: "<category id>" })\`; reuse matching tools already available.`,
     '- Passing a category or wildcard in names explicitly mounts its whole set; reserve that for tasks requiring the whole set.',
   ];
 }
@@ -752,9 +751,9 @@ export function renderCatalogMarkdown(inventory, options = {}) {
     ...quickUnlockLines(inventory, { isPtcMode }),
     '',
     '## 1. Progressive Disclosure Flow (Catalog → Lookup → Detail/Unlock → Unload)',
-    `1. **Catalog (\`catalog\`)**: \`${call}()\` — Overview capability categories and guidelines.`,
-    `2. **Lookup (\`lookup\`)**: \`${call}({ query: "<keyword>" })\` — Search tool or skill names by category or keyword.`,
-    `3. **Detail & Unlock (\`detail\`)**: \`${call}({ names: ["<exact name>"] })\` — Mount the selected capability. Categories and wildcards explicitly mount whole sets.`,
+    `1. **Catalog (\`catalog\`)**: \`${call}({ action: "catalog" })\` — Overview capability categories and guidelines.`,
+    `2. **Lookup (\`lookup\`)**: \`${call}({ action: "lookup", query: "<keyword>" })\` — Search tool or skill names by category or keyword.`,
+    `3. **Detail & Unlock (\`detail\`)**: \`${call}({ action: "detail", names: ["<exact name>"] })\` — Mount the selected capability without executing it. Categories and wildcards explicitly mount whole sets.`,
     `4. **Dynamic Unload (\`unload\`)**: \`${call}({ action: "unload", names: ["<name or category>"] })\` — Prune tools from context to keep it lightweight.`,
     '',
     '## 2. Callable Capability Categories Overview',

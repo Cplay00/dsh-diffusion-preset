@@ -8,52 +8,10 @@ export const name = 'diffusion-controller';
 export const inject = ['tools', 'systemPrompt', 'skills', 'workingDirectory'];
 const VIEW_HOOK_SYM = Symbol.for('dsh.diffusion.viewHook.v3');
 
-/** Format a JSON Schema parameter property for human/LLM-readable detail output. */
+/** Preserve all registered argument constraints in single-tool detail output. */
 function formatParameterSchema(parameters) {
-  if (!parameters || typeof parameters !== 'object') return '  (No parameters)';
-  const hasComposition = schema => schema && typeof schema === 'object' && (
-    ['allOf', 'oneOf', 'anyOf'].some(key => Array.isArray(schema[key])) ||
-    Object.values(schema).some(hasComposition)
-  );
-  // Flattening composed schemas loses branch alternatives and required constraints.
-  if (hasComposition(parameters)) {
-    return `Full parameter schema (preserves branch constraints):\n\`\`\`json\n${JSON.stringify(parameters, null, 2)}\n\`\`\``;
-  }
-  const props = parameters.properties ?? {};
-  const required = new Set(Array.isArray(parameters.required) ? parameters.required : []);
-
-  const keys = Object.keys(props);
-  if (keys.length === 0) return '  (No parameters `{}`)';
-  const lines = [];
-  for (const key of keys) {
-    const spec = props[key] ?? {};
-    const isReq = required.has(key) || spec.required === true;
-    let typeStr = spec.type ?? 'any';
-    if (Array.isArray(spec.enum)) {
-      typeStr = spec.enum.map(v => JSON.stringify(v)).join(' | ');
-    } else if (spec.const !== undefined) {
-      typeStr = JSON.stringify(spec.const);
-    } else if (spec.type === 'array' && spec.items) {
-      const itemType = spec.items.type ?? (Array.isArray(spec.items.enum) ? spec.items.enum.map(v => JSON.stringify(v)).join('|') : 'object');
-      typeStr = `${itemType}[]`;
-    } else if (Array.isArray(spec.oneOf)) {
-      typeStr = 'oneOf<...>';
-    } else if (Array.isArray(spec.anyOf)) {
-      typeStr = 'anyOf<...>';
-    }
-    const desc = spec.description ? ` — ${String(spec.description).replace(/\s+/g, ' ').trim()}` : '';
-    lines.push(`  - \`${key}\` (${typeStr}, ${isReq ? 'required' : 'optional'})${desc}`);
-    if (spec.type === 'object' && spec.properties) {
-      const subReq = new Set(Array.isArray(spec.required) ? spec.required : []);
-      for (const [subKey, subSpec] of Object.entries(spec.properties)) {
-        const subType = subSpec?.type ?? 'any';
-        const subIsReq = subReq.has(subKey) || subSpec?.required === true;
-        const subDesc = subSpec?.description ? ` — ${String(subSpec.description).replace(/\s+/g, ' ').trim()}` : '';
-        lines.push(`      • \`${key}.${subKey}\` (${subType}, ${subIsReq ? 'required' : 'optional'})${subDesc}`);
-      }
-    }
-  }
-  return lines.join('\n');
+  if (!parameters || typeof parameters !== 'object') return '(No parameter schema supplied; inspect the registered tool before supplying arguments.)';
+  return `Full parameter schema:\n\`\`\`json\n${JSON.stringify(parameters, null, 2)}\n\`\`\``;
 }
 
 /** Dependencies are declared explicitly or inferred from skill domain keywords. */
@@ -362,7 +320,7 @@ export function apply(ctx, config = {}) {
     const lines = [
       `# Diffusion Mode · Call Directory (${isPtcMode ? 'PTC Mode' : 'Standard Mode'})`,
       '',
-      `> 💡 **Search First (Recommended)**: Before mounting or calling unfamiliar capabilities, use \`${directoryCall}({ query: "<keyword>" })\` to search dynamically installed tools and skills in this harness.`,
+      `> 💡 **Search First (Recommended)**: Before mounting or calling unfamiliar capabilities, use \`${directoryCall}({ action: "lookup", query: "<keyword>" })\` to search dynamically installed tools and skills in this harness.`,
       '',
       `- **Currently Available Basic Tools**: ${initialList.map(t => `\`${t}\``).join(', ')}`,
       `- **Total Capabilities in Environment**: **${totalTools}** extended tools (**${unlockedCount}** unlocked) + **${skills.length}** domain skills (Skills)`,
@@ -537,6 +495,7 @@ const QUERY_SYNONYMS = {
       `- Search Criteria: category=\`${args.category || 'all'}\`, query=\`${args.query || '(none)'}\``,
       `- Matches: **${matchedTools.length}** tools, **${matchedSkills.length}** skills`,
       '- Lookup only: no tools or skills were mounted.',
+      ...(normalizeTokenList(args.names).length ? ['- `names` is ignored by lookup; use `query` to search names or action "detail" to mount a selection.'] : []),
       ...inventory.warnings.map(warning => `⚠️ ${warning}`),
     ];
 
@@ -544,7 +503,7 @@ const QUERY_SYNONYMS = {
       lines.push(
         '',
         'No matching items found. Suggestions:',
-        `- Call \`${directoryCall}()\` to inspect all available category IDs and recommended shortcuts.`,
+        `- Call \`${directoryCall}({ action: "catalog" })\` to inspect available category IDs.`,
         '- Try a shorter or more general search query.'
       );
       return lines.join('\n');
@@ -566,14 +525,12 @@ const QUERY_SYNONYMS = {
       }
     }
 
-    const firstItem = page[0];
-    const target = firstItem ? (firstItem.kind === 'skill' ? `skill:${firstItem.name}` : firstItem.name) : '<name>';
     lines.push(
       '',
-      '## Next Step: Mount Directly',
-      `- Select only the exact capability needed, e.g. \`${directoryCall}({ names: [${JSON.stringify(target)}] })\`.`,
-      '- Search results are candidates, not a batch mount request.',
-      `> 💡 **Search First (Recommended)**: You can query other keywords anytime via \`${directoryCall}({ query: "<keyword>" })\` before mounting.`
+      '## Next Step: Select by Task Fit',
+      '- Ranking is not a selection: compare descriptions. Reuse a matching [Unlocked] tool directly.',
+      `- For a selected [Locked] tool, use \`${directoryCall}({ action: "detail", names: ["<selected exact name>"] })\`. For [Skill], prefix its name with \`skill:\` to load guidance.`,
+      '- Replace placeholders with one or more names needed for the next operation, not the whole result page. Mounting does not execute the target.'
     );
 
     return lines.join('\n');
@@ -772,7 +729,7 @@ const QUERY_SYNONYMS = {
     if (unmatched.length > 0) {
       lines.push(
         '',
-        `⚠️ **The following names were not found**: ${unmatched.map(u => `\`${u}\``).join(', ')}. 💡 **Recommendation**: Before calling, search currently installed capabilities via \`${directoryCall}({ query: "<keyword>" })\`.`
+        `⚠️ **The following names were not found**: ${unmatched.map(u => `\`${u}\``).join(', ')}. 💡 **Recommendation**: Before calling, search currently installed capabilities via \`${directoryCall}({ action: "lookup", query: "<keyword>" })\`.`
       );
     }
 
@@ -781,14 +738,18 @@ const QUERY_SYNONYMS = {
       if (detailedList.length === 1) {
         const tool = detailedList[0];
         const callSyntax = isPtcMode
-          ? (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(tool.name) ? `await tools.${tool.name}({ ... })` : `await tools[${JSON.stringify(tool.name)}]({ ... })`)
-          : `${tool.name}({ ... })`;
+          ? (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(tool.name) ? `tools.${tool.name}` : `tools[${JSON.stringify(tool.name)}]`)
+          : tool.name;
         lines.push(
           '',
           `## Command Parameter Schema`,
           `### \`${tool.name}\` (${tool.category})`,
           `- **Description**: ${tool.description || '(no description)'}`,
-          `- **Call Syntax**: \`${callSyntax}\``,
+          `- **Call Target**: \`${callSyntax}\``,
+          isPtcMode
+            ? '- **Execute next**: In the next `run_code`, await this SDK function with an argument object satisfying the schema below.'
+            : '- **Execute next**: Call this native tool separately with a JSON argument object satisfying the schema below; do not run the tool name as JavaScript or a shell command.',
+          '- Only availability changed; no target operation ran. Omit unused optional fields and do not send placeholder arguments.',
           `- **Parameters**:`,
           formatParameterSchema(tool.parameters)
         );
@@ -912,7 +873,7 @@ const QUERY_SYNONYMS = {
           ? `🔻 **Successfully unloaded tools (${unloadedRecord.length})**: ${unloadedRecord.map(t => `\`${t}\``).join(', ')}`
           : '⚠️ **No matching tools found to unload** (they may not have been unlocked or names did not match).',
       '',
-      `> 💡 Note: Unloaded tools can be re-mounted at any time via \`${directoryCall}({ names: [...] })\`.`,
+      `> 💡 Note: Unloaded tools can be re-mounted at any time via \`${directoryCall}({ action: "detail", names: [...] })\`.`,
     ];
 
     return {
@@ -928,7 +889,7 @@ const QUERY_SYNONYMS = {
   ctx.tools.register({
     name: 'call_directory',
     description:
-      'Diffusion Mode Call Directory: progressively search, inspect, and mount extended tools, domain skills, MCP servers, and feature plugins on demand, with support for dynamic unloading and context pruning.',
+      'Discover and mount capabilities in this session. Reuse available tools; lookup unknown operations, select exact names, then detail to mount tools or load skill guidance. Call the target separately using its schema. Categories/wildcards deliberately expand whole sets; never mount a result page by default. Prefer explicit action.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -937,17 +898,17 @@ const QUERY_SYNONYMS = {
           type: 'string',
           enum: ['catalog', 'lookup', 'detail', 'unload', 'reset'],
           description:
-            'Stage of operation: "catalog" (overview all capability categories & recommended shortcuts), "lookup" (search specific tools/skills by category or keyword), "detail" (unlock & mount tools/skills; executed automatically when names is provided), "unload" (unload tools to prune context), "reset" (reset session to minimal initial state).',
+            'Explicit action wins: catalog=read-only overview; lookup=read-only candidates; detail=mount tools/load skill guidance, not execute them; unload=prune selected tools; reset=restore initial tool visibility, not erase history. If omitted: non-empty names -> detail, else query/category -> lookup, else catalog.',
         },
         category: {
           type: 'string',
           description:
-            'Category ID, alias, family or full suffix for lookup. With detail/unload, selects a whole category only when names is absent; explicit names take precedence.',
+            'Lookup filter: registered category ID, alias, family or full suffix. With detail/unload, selects a whole category only without non-empty names. Prefer exact names to whole-category changes.',
         },
         query: {
           type: 'string',
           description:
-            'Case-insensitive search of names, categories and descriptions. Space-separated terms must all match; each term may match its synonyms. Lookup never mounts capabilities.',
+            'Lookup only: a concrete operation to search in names, categories and descriptions, not a mount target. Case-insensitive; space-separated terms must all match, with synonyms per term. Does not load skill bodies or mount tools.',
         },
         offset: {
           type: 'integer',
@@ -955,11 +916,11 @@ const QUERY_SYNONYMS = {
         },
         limit: {
           type: 'integer',
-          description: 'Lookup only: combined tool and skill candidates per page. Defaults to 20. No parameter schemas or skill bodies are loaded.',
+          description: 'Lookup only: combined tool/skill candidates per page. Default 20; capped at 20 with query, 100 without query. Follow the returned next-page instruction when needed.',
         },
         names: {
           description:
-            'Exact tool/skill names to mount or unload (e.g. ["read", "grep"]); takes precedence over category. Category aliases and wildcards explicitly mount whole sets. A category suffix must be unique; otherwise use its full ID.',
+            'Prefer an array of exact names needed next, e.g. ["read"]. For skill guidance use ["skill:<registered name>"]. Used by detail/unload, ignored by lookup/catalog. Non-empty names override category. Aliases/categories/wildcards expand whole sets; category suffixes must be unique. Do not put business arguments here.',
           oneOf: [
             { type: 'array', items: { type: 'string' } },
             { type: 'string' },
@@ -973,10 +934,10 @@ const QUERY_SYNONYMS = {
         additionalProperties: false,
         properties: {
           stage: { type: 'string', enum: ['catalog', 'lookup', 'detail', 'unload', 'reset'] },
-          unlocked: { type: 'array', items: { type: 'string' } },
-          unloaded: { type: 'array', items: { type: 'string' } },
-          loadedSkills: { type: 'array', items: { type: 'string' } },
-          report: { type: 'string' },
+          unlocked: { type: 'array', items: { type: 'string' }, description: 'Availability records, including already available selections; "*" can represent full mounting. Not a count of newly added tools.' },
+          unloaded: { type: 'array', items: { type: 'string' }, description: 'Removed tool records; "*" represents reset.' },
+          loadedSkills: { type: 'array', items: { type: 'string' }, description: 'Skill instructions loaded successfully, not business operations executed.' },
+          report: { type: 'string', description: 'Read for schemas, newly mounted/already available counts, unmatched names, ambiguity and skill loading failures. A successful directory call may have unmatched selections.' },
         },
         required: ['stage', 'unlocked', 'unloaded', 'loadedSkills', 'report'],
       },
@@ -990,16 +951,10 @@ const QUERY_SYNONYMS = {
     isConcurrencySafe: args => ['catalog', 'lookup'].includes(directoryStage(args)),
     presentCall(args = {}) {
       const stage = directoryStage(args);
-      const target =
-        args?.action === 'reset'
-          ? 'reset-all'
-          : Array.isArray(args?.names) && args.names.length > 0
-            ? args.names.join(', ')
-            : typeof args?.names === 'string' && args.names.trim()
-              ? args.names.trim()
-              : args?.unload
-                ? (Array.isArray(args.unload) ? args.unload.join(', ') : String(args.unload))
-                : args?.category || args?.query || 'all';
+      const target = stage === 'reset' ? 'reset-all'
+        : stage === 'catalog' ? 'all'
+          : stage === 'lookup' ? [args.category, args.query].filter(value => value?.trim()).join(' / ') || 'all'
+            : normalizeTokenList(args.names || args.unload).join(', ') || args.category || 'none';
       return {
         card: 'generic',
         title: `调用目录 (${stage}): ${target}`,
@@ -1009,7 +964,7 @@ const QUERY_SYNONYMS = {
     },
     async execute(args = {}, exec) {
       if (args.action && !['catalog', 'lookup', 'detail', 'unload', 'reset'].includes(args.action)) {
-        throw new TypeError(`Unknown directory action: ${args.action}`);
+        throw new TypeError(`Unknown directory action: ${args.action}. Use catalog, lookup, detail, unload or reset.`);
       }
       const agent = exec?.agent;
       const signal = exec?.signal;
@@ -1076,7 +1031,7 @@ const QUERY_SYNONYMS = {
       const choices = [];
       if (available.has('subagent')) choices.push('`subagent` for a self-contained brief in a fresh context');
       if (available.has('subagent_fork')) choices.push(available.has('subagent') ? '`subagent_fork` when completed conversation history is needed' : '`subagent_fork` as the available launcher, with a complete brief for this task');
-      lines.push(`- **Bounded delegation**: Choose ${choices.join('; or ')}. Mount only the chosen launcher with \`${directoryCall}({ names: ["<chosen exact name>"] })\`. Dispatch once scope and inputs are sufficient; do not pre-solve the delegated task. Follow its reporting contract: Team-only roster/wait tools do not track independent subagents.`);
+      lines.push(`- **Bounded delegation**: Choose ${choices.join('; or ')}. Mount only the chosen launcher with \`${directoryCall}({ action: "detail", names: ["<chosen exact name>"] })\`. Dispatch once scope and inputs are sufficient; do not pre-solve the delegated task. Follow its reporting contract: Team-only roster/wait tools do not track independent subagents.`);
     }
     if (canStartTeam) lines.push('- **Durable team**: As lead, choose `spawn_teammate` for sustained parallel responsibilities needing repeated coordination or shared task dependencies. Reuse suitable agents, start the smallest useful team, and mount waiting/task-board tools only as needed.');
     if (assigned || coordinating || launchers.some(isVisible)) lines.push(
@@ -1098,11 +1053,11 @@ const QUERY_SYNONYMS = {
         'The current session runs in **Diffusion Mode**, starting with minimal essential tools and progressively expanding on demand to keep context lean and focused.',
         '',
         '## ⚡ Operating Guidelines (Search First Recommended)',
-        `1. **Search First (Recommended)**: Reuse available tools and exact names already verified in this session. For an unknown capability, search a concrete operation with \`${directoryCall}({ query: "<operation>" })\`; combine terms to narrow results. Inspect available categories with \`${directoryCall}()\`; \`${directoryCall}({ category: "<id>" })\` lists candidates without mounting.`,
-        `2. **Mount Exact Names**: Select only the tool or skill needed for the next action: \`${directoryCall}({ names: ["<exact name>"] })\`. Do not mount search results as a batch. Categories and wildcards in names mount whole sets; use them only when the task requires that whole set.`,
-        isPtcMode ? '3. **Execute via SDK**: Run the directory snippets above inside `run_code`. Discover and mount SDK capabilities for supported operations, including file reads/searches, before substituting raw filesystem or shell APIs. Use `await tools.<name>(args)` in the next `run_code` after mounting. Use JavaScript for batching independent calls, transforming data and operations without a suitable SDK tool; print only relevant results.' : '3. **Execute**: Invoke mounted native tools directly; batch independent reads when supported. Mounting makes a tool available; it does not execute it.',
+        `1. **Search First (Recommended)**: Reuse available tools and exact names already verified in this session. For an unknown capability, search a concrete operation with \`${directoryCall}({ action: "lookup", query: "<operation>" })\`; combine terms to narrow results. Inspect available categories with \`${directoryCall}({ action: "catalog" })\`; \`${directoryCall}({ action: "lookup", category: "<id>" })\` lists candidates without mounting.`,
+        `2. **Mount Exact Names**: Select by task fit, not result order: \`${directoryCall}({ action: "detail", names: ["<exact name>"] })\`; prefix a skill name with \`skill:\` to load guidance. Do not mount a result page. Categories/wildcards select whole sets. Read the report for unmatched names or failures before continuing.`,
+        isPtcMode ? '3. **Execute via SDK**: Run directory snippets inside `run_code`. Use the selected SDK function in the next `run_code` after mounting: await tools.name(args), or await tools["exact-name"](args) for other names. Follow its actual schema; omit unused optional fields and replace placeholders. Prefer suitable SDK tools for file/search operations; JavaScript can batch independent calls, transform data or cover operations without a suitable SDK tool. Print only relevant results.' : '3. **Execute**: Native examples name a tool and its JSON arguments; they are not shell commands or global JavaScript functions. Invoke the mounted target separately using its actual schema. Omit unused optional fields and replace placeholders; mounting did not execute the target. Batch independent reads when supported.',
         '4. **Focus**: Search for locations before reading large files, then read relevant ranges. Avoid repeated whole-file reads and stop inspecting when evidence is sufficient for the requested task.',
-        `5. **Prune**: At phase completion, unload tools no longer needed with \`${directoryCall}({ action: "unload", names: [...] })\` or reset with \`${directoryCall}({ action: "reset" })\`.`,
+        `5. **Prune by benefit**: Keep a small reusable surface; do not add a cleanup call after every small read. Unload obsolete expanded sets when context savings justify another call: \`${directoryCall}({ action: "unload", names: ["<obsolete exact name>"] })\`. Use \`${directoryCall}({ action: "reset" })\` only when the expanded surface is no longer useful and no active work needs it.`,
         ...collaborationGuidance(context?.scope),
       ].join('\n'),
   });
@@ -1186,7 +1141,7 @@ const QUERY_SYNONYMS = {
       }
 
       const family = classifyTool(toolName, policy);
-      const msg = `Diffusion Mode Guard: Tool "${toolName}" is installed in this harness (${family}) but is currently locked to preserve context budget.\n💡 Recommendation: Search capabilities with \`${directoryCall}({ query: "${toolName}" })\`, or mount directly with \`${directoryCall}({ names: [${JSON.stringify(toolName)}] })\`.`;
+      const msg = `Diffusion Mode Guard: Tool "${toolName}" is installed in this harness (${family}) but is currently locked to preserve context budget.\n💡 Recommendation: Search capabilities with \`${directoryCall}({ action: "lookup", query: "${toolName}" })\`, or mount directly with \`${directoryCall}({ action: "detail", names: [${JSON.stringify(toolName)}] })\`.`;
       return {
         kind: 'deny',
         reason: msg,
@@ -1208,7 +1163,7 @@ const QUERY_SYNONYMS = {
       !controller.isToolVisible(agent, toolName) &&
       viewHook.unfilteredView(agent).visible.has(toolName)
     ) {
-      const msg = `Error: Tool "${toolName}" exists in this harness but is currently locked in Diffusion Mode. Recommendation: Search installed capabilities first via \`${directoryCall}({ query: "${toolName}" })\` or call \`${directoryCall}({ names: [${JSON.stringify(toolName)}] })\` to unlock it.`;
+      const msg = `Error: Tool "${toolName}" exists in this harness but is currently locked in Diffusion Mode. Recommendation: Search installed capabilities first via \`${directoryCall}({ action: "lookup", query: "${toolName}" })\` or call \`${directoryCall}({ action: "detail", names: [${JSON.stringify(toolName)}] })\` to unlock it.`;
       return {
         kind: 'block',
         feedback: [{ type: 'text', text: msg }],
