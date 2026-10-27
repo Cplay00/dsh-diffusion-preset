@@ -1,0 +1,380 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve, sep } from 'node:path';
+import { setImmediate as immediate } from 'node:timers/promises';
+import { execFileSync } from 'node:child_process';
+import { apply } from './runtime-v2.js';
+import { apply as legacyApply } from './runtime.js';
+import { apply as applyHost } from './index.js';
+import { buildCompleteInventory, createCatalogPolicy, renderCatalogMarkdown } from './catalog-builder.js';
+
+function harness(t, config = {}, options = {}) {
+  const definitions = new Map((options.names ?? ['bash', 'read', 'write', 'edit', 'skill'])
+    .map(name => [name, { name, description: name, parameters: {} }]));
+  const skillDefs = new Map();
+  const extras = new Map();
+  const hooks = new Map();
+  const cleanups = [];
+  const preset = {};
+  class Tools {
+    view(scope) {
+      return { visible: options.sharedView ? definitions : new Map([...definitions, ...(extras.get(scope) ?? [])]) };
+    }
+    schemaOf(def) { return def; }
+    register(def) { this.directory = def; definitions.set(def.name, def); }
+  }
+  const tools = new Tools();
+  const originalView = tools.view;
+  const layer = {};
+  if (options.scoped) tools.layers = {
+    scoped: new Map([[preset, layer]]),
+    chainLayers: agent => agent.preset === preset ? [layer] : [],
+  };
+  const ctx = {
+    tools,
+    skills: {
+      list: async ({ scope }) => [...skillDefs.values()].filter(s => !s.scope || s.scope === scope),
+      get: async name => skillDefs.get(name),
+    },
+    workingDirectory: { ensure: async agent => agent.cwd ?? process.cwd(), defaultDirectory: process.cwd() },
+    systemPrompt: { section: def => { ctx.guide = def; } },
+    get: name => name === 'agents' ? { list: () => h.agents, currentInitiator: () => h.initiator } : undefined,
+    on(event, fn) {
+      const handlers = hooks.get(event) ?? [];
+      handlers.push(fn);
+      hooks.set(event, handlers);
+      return () => handlers.splice(handlers.indexOf(fn), 1);
+    },
+    emit: event => { for (const fn of hooks.get(event) ?? []) fn(); },
+    effect: fn => { const cleanup = fn(); if (cleanup) cleanups.push(cleanup); },
+  };
+  ctx.root = ctx;
+  if (options.scoped) ctx[Symbol('dsh.scope')] = preset;
+  const h = {
+    ctx, tools, definitions, skillDefs, extras, hooks, agents: [], originalView,
+    agent(events = []) {
+      const agent = { preset, events, session: { get seq() { return events.length; }, eventAt: i => events[i], header: {} } };
+      h.agents.push(agent);
+      return agent;
+    },
+    async call(agent, args = {}) {
+      const result = await tools.directory.execute(args, { agent });
+      agent.events.push({ type: config.mode === 'ptc' ? 'tool/ptc-dispatch' : 'tool/result', data: { meta: tools.directory.output.presentationMeta(args, result) } });
+      return result;
+    },
+    visible: agent => [...tools.view(agent).visible.keys()],
+    dispose: () => { while (cleanups.length) cleanups.pop()(); },
+  };
+  t.after(h.dispose);
+  if (options.mount !== false) apply(ctx, config);
+  return h;
+}
+
+test('initial tools are replaceable and guide/reminders can be disabled', async t => {
+  const h = harness(t, { initialTools: ['custom_shell'], guide: false, usageReminder: false }, { names: ['bash', 'custom_shell', 'read'] });
+  const agent = h.agent();
+  assert.deepEqual(h.visible(agent).sort(), ['call_directory', 'custom_shell']);
+  assert.equal(h.ctx.guide, undefined);
+  assert.doesNotMatch((await h.call(agent)).report, /Capability Guidance/);
+  assert(createCatalogPolicy().initialTools.has('bash'), 'configuration must not mutate defaults');
+});
+
+test('custom categories, aliases and plugin families replace defaults', async t => {
+  const h = harness(t, {
+    categories: { 'core:custom': { title: 'Custom', summary: 'Custom tools', tools: ['read'] } },
+    aliases: { files: 'core:custom' }, pluginFamilies: [{ id: 'plugin:custom', prefix: 'vendor_' }],
+  }, { names: ['read', 'vendor_fetch'] });
+  const agent = h.agent();
+  const catalog = await h.call(agent);
+  assert.match(catalog.report, /core:custom/);
+  assert.doesNotMatch(catalog.report, /core:file/);
+  assert((await h.call(agent, { names: ['files'] })).unlocked.includes('read'));
+  assert((await h.call(agent, { names: ['plugin:custom'] })).unlocked.includes('vendor_fetch'));
+  assert.equal((await h.call(agent, { names: ['constructor'] })).unlocked.length, 0);
+});
+
+test('unknown MCP and plugin families are independently discoverable', async t => {
+  const h = harness(t, {}, { names: ['mcp__NewVendor__query', 'acme_fetch', 'other_fetch'] });
+  const agent = h.agent();
+  assert((await h.call(agent, { names: ['mcp:newvendor'] })).unlocked.includes('mcp__NewVendor__query'));
+  assert((await h.call(agent, { action: 'unload', names: ['newvendor'] })).unloaded.includes('mcp__NewVendor__query'));
+  assert.deepEqual((await h.call(agent, { names: ['plugin:acme'] })).unlocked, ['acme_fetch']);
+  assert(!h.visible(agent).includes('other_fetch'));
+});
+
+test('rendered inventory advertises only registered initial tools and available categories', async t => {
+  const h = harness(t, {}, { names: ['custom_shell'], mount: false });
+  const inv = await buildCompleteInventory(h.ctx);
+  const md = renderCatalogMarkdown(inv);
+  assert.doesNotMatch(md, /`bash`|`pwsh`|`read_image`|core:file|core:subagent/);
+  assert.match(md, /plugin:custom/);
+});
+
+test('tool and skill additions, removals and schema changes appear without stale cache', async t => {
+  const h = harness(t);
+  const agent = h.agent();
+  await h.call(agent);
+  h.ctx[Symbol.for('dsh.diffusion.sharedCatalog.v3')] = { inventory: { allToolsMap: new Map(), categories: new Map(), skills: [] } };
+  h.definitions.set('mcp__late__query', { name: 'mcp__late__query', description: 'New service', parameters: {} });
+  h.skillDefs.set('late-skill', { name: 'late-skill', description: 'New skill', content: 'New instructions' });
+  assert((await h.call(agent, { names: ['mcp:late'] })).unlocked.includes('mcp__late__query'));
+  h.definitions.get('mcp__late__query').parameters = { properties: { changed: { type: 'string' } } };
+  assert.match((await h.call(agent, { names: ['mcp__late__query'] })).report, /changed/);
+  assert.deepEqual((await h.call(agent, { names: ['late-skill'] })).loadedSkills, ['late-skill']);
+  h.definitions.delete('mcp__late__query');
+  h.skillDefs.delete('late-skill');
+  assert.match((await h.call(agent, { names: ['mcp:late', 'late-skill'] })).report, /not found/);
+});
+
+test('inventories and unlocks stay within the requesting agent scope', async t => {
+  const h = harness(t, {}, { scoped: true });
+  const a = h.agent();
+  const b = h.agent();
+  h.extras.set(a, new Map([['private_tool', { name: 'private_tool' }]]));
+  h.skillDefs.set('private-skill', { name: 'private-skill', description: 'Private', scope: a });
+  await h.call(a, { names: ['write'] });
+  assert(!h.visible(b).includes('write'));
+  assert.match((await h.call(a)).report, /private_tool/);
+  assert.doesNotMatch((await h.call(b)).report, /private_tool|private-skill/);
+  const global = await buildCompleteInventory(h.ctx);
+  assert(!global.allToolsMap.has('private_tool'), 'host inventory must not merge an arbitrary sample agent');
+});
+
+test('filtering does not mutate a shared host view and disposal restores the hook', async t => {
+  const h = harness(t, {}, { sharedView: true });
+  const agent = h.agent();
+  assert(!h.visible(agent).includes('write'));
+  assert(h.definitions.has('write'));
+  h.dispose();
+  assert.equal(h.tools.view, h.originalView);
+  assert(h.visible(agent).includes('write'));
+});
+
+test('controllers on the same prototype do not affect other tool service instances', t => {
+  const h = harness(t, { initialTools: ['read'] });
+  const first = h.agent();
+  const otherTools = new h.tools.constructor();
+  const otherCtx = { ...h.ctx, tools: otherTools };
+  otherCtx.root = otherCtx;
+  apply(otherCtx, { initialTools: ['write'] });
+  assert(h.visible(first).includes('read'));
+  assert(!h.visible(first).includes('write'));
+  const second = h.agent();
+  assert(otherTools.view(second).visible.has('write'));
+  assert(!otherTools.view(second).visible.has('read'));
+});
+
+test('child agents inherit the parent exclusions after full unlock', async t => {
+  const h = harness(t);
+  const parent = h.agent();
+  await h.call(parent, { names: ['*'] });
+  await h.call(parent, { action: 'unload', names: ['write'] });
+  h.initiator = parent;
+  const child = h.agent();
+  assert(!h.visible(child).includes('write'));
+  assert(h.visible(child).includes('read'));
+});
+
+test('overlapping companion groups expand transitively in either order', async t => {
+  const h = harness(t, { companionGroups: [['a', 'b'], ['b', 'c']] }, { names: ['a', 'b', 'c'] });
+  assert.deepEqual((await h.call(h.agent(), { names: ['c'] })).unlocked.sort(), ['a', 'b', 'c']);
+});
+
+test('skill dependencies use explicit declarations instead of name substrings', async t => {
+  const h = harness(t, { skillCompanions: { declared: ['write'] } });
+  const agent = h.agent();
+  h.skillDefs.set('doctor', { name: 'doctor', description: 'Medical reasoning', content: 'Reason carefully' });
+  h.skillDefs.set('declared', { name: 'declared', description: 'Declared dependency', content: 'Write a file' });
+  await h.call(agent, { names: ['doctor'] });
+  assert(!h.visible(agent).includes('write'));
+  await h.call(agent, { names: ['declared'] });
+  assert(h.visible(agent).includes('write'));
+});
+
+test('failed skill loads are reported and do not unlock dependencies', async t => {
+  const h = harness(t, { skillCompanions: { broken: ['write'] } });
+  const agent = h.agent();
+  h.skillDefs.set('broken', { name: 'broken', description: 'Unavailable' });
+  h.ctx.skills.get = async () => { throw new Error('Provider offline'); };
+  const result = await h.call(agent, { names: ['broken'] });
+  assert.match(result.report, /could not be loaded/);
+  assert.deepEqual(result.loadedSkills, []);
+  assert(!h.visible(agent).includes('write'));
+});
+
+test('skill loads use the requesting working directory even without agent.ctx', async t => {
+  const h = harness(t);
+  const agent = h.agent();
+  agent.cwd = 'scope-specific-directory';
+  h.skillDefs.set('scoped', { name: 'scoped', description: 'Scoped' });
+  h.ctx.skills.get = async (name, options) => {
+    assert.equal(options.cwd, agent.cwd);
+    assert.equal(options.scope, agent);
+    return { name, content: 'Scoped instructions' };
+  };
+  assert.deepEqual((await h.call(agent, { names: ['scoped'] })).loadedSkills, ['scoped']);
+});
+
+for (const mode of ['native', 'ptc']) {
+  test(`${mode}: full unlock, selective unload, durable replay, remount and reset change visibility`, async t => {
+    const h = harness(t, { mode }, { names: ['bash', 'write', 'read', 'run_code', 'structured_output'] });
+    const agent = h.agent();
+    await h.call(agent, { names: ['*'] });
+    assert(h.visible(agent).includes('write'));
+    await h.call(agent, { action: 'unload', names: ['write'] });
+    assert(!h.visible(agent).includes('write'));
+    assert(h.visible(agent).includes('read'));
+    const restored = h.agent([...agent.events]);
+    assert(!h.visible(restored).includes('write'));
+    assert(h.visible(restored).includes('read'));
+    await h.call(restored, { names: ['write'] });
+    assert(h.visible(restored).includes('write'));
+    await h.call(restored, { action: 'reset' });
+    assert(!h.visible(restored).includes('write'));
+    assert(!h.visible(restored).includes('read'));
+    assert(h.visible(restored).includes('call_directory'));
+    if (mode === 'ptc') assert(h.visible(restored).includes('run_code'));
+    await h.call(restored, { names: ['*'] });
+    await h.call(restored, { action: 'unload', names: ['ALL'] });
+    assert(!h.visible(restored).includes('write'));
+  });
+}
+
+test('custom PTC initial tools retain the transport required to unlock capabilities', async t => {
+  const h = harness(t, { mode: 'ptc', initialTools: [] }, { names: ['run_code', 'structured_output', 'write'] });
+  assert.deepEqual(h.visible(h.agent()).sort(), ['call_directory', 'run_code', 'structured_output']);
+});
+
+test('prefix expansion requires an explicit wildcard for both mount and unload', async t => {
+  const h = harness(t, {}, { names: ['write_file', 'write_note'] });
+  const agent = h.agent();
+  assert.equal((await h.call(agent, { names: ['wri'] })).unlocked.length, 0);
+  assert.equal((await h.call(agent, { names: ['write*'] })).unlocked.length, 2);
+  assert.equal((await h.call(agent, { action: 'unload', names: ['write*'] })).unloaded.length, 2);
+  assert(!h.visible(agent).includes('write_file'));
+});
+
+test('aborted discovery rejects instead of silently returning an incomplete inventory', async t => {
+  const h = harness(t);
+  const abort = new AbortController();
+  h.ctx.skills.list = async () => { abort.abort(); throw abort.signal.reason; };
+  await assert.rejects(h.tools.directory.execute({}, { agent: h.agent(), signal: abort.signal }), { name: 'AbortError' });
+});
+
+test('working-directory failures never discover skills from a different workspace', async t => {
+  const h = harness(t);
+  let listed = false;
+  h.ctx.workingDirectory.ensure = async () => { throw new Error('Workspace unavailable'); };
+  h.ctx.skills.list = async () => { listed = true; return []; };
+  const result = await h.call(h.agent());
+  assert.equal(listed, false);
+  assert.match(result.report, /Skill discovery failed: Workspace unavailable/);
+});
+
+test('all result stages satisfy the declared output fields and unknown actions reject', async t => {
+  const h = harness(t);
+  const agent = h.agent();
+  for (const action of ['catalog', 'lookup', 'detail', 'unload', 'reset']) {
+    const result = await h.call(agent, { action, names: ['write'] });
+    for (const key of h.tools.directory.output.schema.required) assert(Object.hasOwn(result, key));
+    assert.equal(result.stage, action);
+  }
+  await assert.rejects(h.call(agent, { action: 'typo' }), /Unknown directory action/);
+});
+
+test('MCP and team prompt sections follow actual tool visibility', async t => {
+  const h = harness(t, {}, { names: ['mcp__acme__query', 'spawn_teammate'] });
+  const agent = h.agent();
+  const original = { sections: [{ name: 'mcp:acme' }, { name: 'team:policy' }, { name: 'user' }], contexts: [{ name: 'team:identity' }] };
+  const assemble = () => h.hooks.get('system-prompt/assemble')[0](null, { scope: agent }, async () => original);
+  assert.deepEqual((await assemble()).sections, [{ name: 'user' }]);
+  await h.call(agent, { names: ['mcp:acme'] });
+  assert((await assemble()).sections.some(s => s.name === 'mcp:acme'));
+  await h.call(agent, { names: ['*'] });
+  await h.call(agent, { action: 'unload', names: ['spawn_teammate'] });
+  assert(!(await assemble()).sections.some(s => s.name === 'team:policy'));
+  assert.equal((await assemble()).contexts.length, 0);
+});
+
+function temporaryDirectory(t) {
+  const directory = mkdtempSync(join(tmpdir(), 'diffusion-regression-'));
+  t.after(() => {
+    assert(resolve(directory).startsWith(resolve(tmpdir()) + sep));
+    rmSync(directory, { recursive: true, force: true });
+  });
+  return directory;
+}
+
+async function tickHost(t, delay = 250) {
+  t.mock.timers.tick(delay);
+  await immediate();
+}
+
+test('host export is disabled by default and publishes no sample-agent tools', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const h = harness(t, {}, { mount: false });
+  const directory = temporaryDirectory(t);
+  h.ctx.workingDirectory.defaultDirectory = directory;
+  applyHost(h.ctx);
+  await tickHost(t, 100);
+  assert.deepEqual(readdirSync(directory), []);
+  assert(h.ctx[Symbol.for('dsh.diffusion.sharedCatalog.v3')]);
+});
+
+test('opt-in export follows workspace changes and updates changed metadata', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const h = harness(t, {}, { mount: false });
+  const directory = temporaryDirectory(t);
+  const other = join(directory, 'other');
+  mkdirSync(other);
+  h.ctx.workingDirectory.defaultDirectory = directory;
+  applyHost(h.ctx, { exportCatalog: true, catalogPath: 'capabilities.md' });
+  await tickHost(t, 100);
+  assert.match(readFileSync(join(directory, 'capabilities.md'), 'utf8'), /generated-catalog/);
+  h.definitions.get('write').description = 'Changed description';
+  h.ctx.emit('tools/change');
+  await tickHost(t);
+  assert.match(readFileSync(join(directory, 'capabilities.md'), 'utf8'), /Changed description/);
+  h.ctx.workingDirectory.defaultDirectory = other;
+  h.ctx.emit('tools/change');
+  await tickHost(t);
+  assert.match(readFileSync(join(other, 'capabilities.md'), 'utf8'), /Changed description/);
+});
+
+test('opt-in export preserves an existing unmanaged file and reports the failure', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const h = harness(t, {}, { mount: false });
+  const directory = temporaryDirectory(t);
+  h.ctx.workingDirectory.defaultDirectory = directory;
+  writeFileSync(join(directory, 'notes.md'), 'User content');
+  const warn = t.mock.method(console, 'warn', () => {});
+  applyHost(h.ctx, { exportCatalog: true, catalogPath: 'notes.md' });
+  await tickHost(t, 100);
+  assert.equal(readFileSync(join(directory, 'notes.md'), 'utf8'), 'User content');
+  assert.match(warn.mock.calls[0].arguments[0], /Refusing to overwrite/);
+});
+
+test('host disposal prevents an in-flight refresh from publishing or writing', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const h = harness(t, {}, { mount: false });
+  const directory = temporaryDirectory(t);
+  h.ctx.workingDirectory.defaultDirectory = directory;
+  let finish;
+  h.ctx.skills.list = () => new Promise(resolve => { finish = resolve; });
+  applyHost(h.ctx, { exportCatalog: true });
+  t.mock.timers.tick(100);
+  h.dispose();
+  finish([]);
+  await immediate();
+  assert.equal(h.ctx[Symbol.for('dsh.diffusion.sharedCatalog.v3')], undefined);
+  assert.deepEqual(readdirSync(directory), []);
+});
+
+test('legacy entry uses the same implementation and inspection does not claim live readiness', () => {
+  assert.equal(legacyApply, apply);
+  const output = execFileSync(process.execPath, ['sync-catalog.js'], { encoding: 'utf8' });
+  assert.match(output, /No live DSH preset verification was performed/);
+  assert.doesNotMatch(output, /: Ready/);
+});

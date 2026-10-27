@@ -1,6 +1,3 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-
 /** Tools that belong to the initial Minimal Mode surface and are always available from step 1. */
 export const INITIAL_TOOLS = new Set([
   'call_directory',
@@ -166,10 +163,48 @@ export const KNOWN_PLUGIN_FAMILIES = [
 /** Concise footer reminder placed at the end of directory outputs (focused on Subagent & Skill). */
 export const USAGE_REMINDER_FOOTER = [
   '---',
-  '### 💡 Active Guidance on Core Capabilities (Must Read: Subagents & Skills)',
-  '1. **Subagents (`subagent`)**: For multi-file/cross-module exploration or parallelizable tasks, unlock `subagent` immediately to delegate; avoid serializing everything in the main session.',
-  '2. **Domain Skills (`skills`)**: For specialized domain tasks (Office documents, UI design, reverse engineering, browser automation, etc.), always load the corresponding `skill` first instead of writing ad-hoc scripts.',
+  '### 💡 Capability Guidance (Subagents & Skills)',
+  '1. **Subagents**: When delegation is useful and available, inspect the corresponding category before unlocking tools.',
+  '2. **Domain Skills**: Search registered skills for relevant workflows and follow the user and workspace instructions.',
 ].join('\n');
+
+/** DSH defaults are replaceable; only the directory and PTC transport stay reachable. */
+export function createCatalogPolicy(config = {}) {
+  const initialTools = new Set(config.initialTools ?? INITIAL_TOOLS);
+  initialTools.add('call_directory');
+  if (config.mode === 'ptc') {
+    initialTools.add('run_code');
+    initialTools.add('structured_output');
+  }
+  const categories = Object.fromEntries(Object.entries(config.categories ?? CATEGORY_META)
+    .map(([id, meta]) => [id, { ...meta, tools: new Set(meta.tools ?? []) }]));
+  return {
+    initialTools,
+    categories,
+    aliases: Object.assign(Object.create(null), config.aliases ?? CATEGORY_ALIASES),
+    pluginFamilies: (config.pluginFamilies ?? KNOWN_PLUGIN_FAMILIES)
+      .map(family => ({ ...family, exact: new Set(family.exact ?? []) })),
+    mcpDescriptions: Object.assign(Object.create(null), config.mcpDescriptions ?? KNOWN_MCP_DESCRIPTIONS),
+    companionGroups: config.companionGroups ?? COMPANION_GROUPS,
+    skillCompanions: Object.assign(Object.create(null), config.skillCompanions ?? {}),
+    usageReminder: config.usageReminder === false ? '' : config.usageReminder ?? USAGE_REMINDER_FOOTER,
+  };
+}
+
+export function unwrapService(service) {
+  let current = service;
+  const original = Symbol.for('cordis.original');
+  while (current && current[original]) current = current[original];
+  return current;
+}
+
+export function getScopeOf(ctx) {
+  for (let cur = ctx; cur && cur !== Object.prototype; cur = Object.getPrototypeOf(cur)) {
+    const sym = Object.getOwnPropertySymbols(cur).find(s => s.description === 'dsh.scope');
+    if (sym) return ctx[sym];
+  }
+  return undefined;
+}
 
 export function firstLineSummary(text, maxLen = 140) {
   const clean = String(text ?? '').replace(/\s+/g, ' ').trim();
@@ -177,11 +212,26 @@ export function firstLineSummary(text, maxLen = 140) {
   return `${clean.slice(0, maxLen - 1)}…`;
 }
 
-export function classifyTool(toolName) {
-  if (INITIAL_TOOLS.has(toolName)) return 'initial';
+/** Recommend only categories that actually exist in this inventory. */
+export function quickUnlockLines(inventory) {
+  const ids = [...inventory.categories.keys()];
+  const lines = [];
+  if (ids.includes('core:file') && ids.includes('core:task')) {
+    lines.push('- 💻 **Coding & Tasks**: `call_directory({ names: ["core:file", "core:task"] })`');
+  }
+  for (const id of ids) {
+    const category = inventory.categories.get(id);
+    lines.push(`- **${category.title}**: \`call_directory({ names: [${JSON.stringify(id)}] })\``);
+  }
+  lines.push('- 🚀 **Full Tool Unlock**: `call_directory({ names: ["*"] })`');
+  return lines;
+}
+
+export function classifyTool(toolName, policy = createCatalogPolicy()) {
+  if (policy.initialTools.has(toolName)) return 'initial';
   if (toolName.startsWith('mcp__')) {
     const parts = toolName.split('__');
-    const server = parts[1] || 'unknown';
+    const server = (parts[1] || 'unknown').toLowerCase();
     return `mcp:${server}`;
   }
   if (
@@ -191,15 +241,15 @@ export function classifyTool(toolName) {
   ) {
     return 'mcp:resources';
   }
-  for (const family of KNOWN_PLUGIN_FAMILIES) {
+  for (const family of policy.pluginFamilies) {
     if (family.prefix && toolName.startsWith(family.prefix)) return family.id;
     if (family.exact && family.exact.has(toolName)) return family.id;
   }
-  for (const [catId, meta] of Object.entries(CATEGORY_META)) {
+  for (const [catId, meta] of Object.entries(policy.categories)) {
     if (meta.tools.has(toolName)) return catId;
   }
-  if (toolName.startsWith('ops_')) return 'core:file';
-  return 'plugin:other';
+  const separator = toolName.indexOf('_');
+  return separator > 0 ? `plugin:${toolName.slice(0, separator).toLowerCase()}` : 'plugin:other';
 }
 
 export function escapeAttr(value) {
@@ -255,13 +305,16 @@ export function renderSkillContent(skill) {
 }
 
 /** Build complete inventory map for a tool set and skills set. */
-export async function buildCompleteInventory(ctx, targetScope, signal) {
-  const rawTools = ctx.tools;
-  const proto = Object.getPrototypeOf(rawTools);
-  const hook = proto[Symbol.for('dsh.diffusion.viewHook.v3')];
+export async function buildCompleteInventory(ctx, targetScope, signal, options = {}) {
+  signal?.throwIfAborted();
+  const policy = options.policy ?? createCatalogPolicy();
+  const rawTools = unwrapService(ctx.tools);
+  const hook = rawTools[Symbol.for('dsh.diffusion.viewHook.v3')];
 
   let fullView;
-  if (hook?.origView) {
+  if (options.view) {
+    fullView = options.view(targetScope);
+  } else if (hook?.origView) {
     hook.bypass++;
     try {
       fullView = hook.origView.call(rawTools, targetScope);
@@ -276,30 +329,8 @@ export async function buildCompleteInventory(ctx, targetScope, signal) {
 
   const mergedDefs = new Map(fullView.visible.entries());
 
-  // Merge sample agent tools (for per-agent dynamic tools like ops and teams)
-  try {
-    const sampleAgent = ctx.get('agents')?.list?.()?.[0];
-    if (sampleAgent) {
-      let sampleView;
-      if (hook?.origView) {
-        hook.bypass++;
-        try {
-          sampleView = hook.origView.call(rawTools, sampleAgent);
-        } finally {
-          hook.bypass--;
-        }
-      } else {
-        sampleView = rawTools.view(sampleAgent);
-      }
-      for (const [k, v] of sampleView.visible.entries()) {
-        if (!mergedDefs.has(k)) mergedDefs.set(k, v);
-      }
-    }
-  } catch {}
-
   const allToolsMap = new Map();
   for (const [tName, def] of mergedDefs.entries()) {
-    if (tName === 'run_code' || tName === 'call_directory' || tName === 'structured_output') continue;
     const schema = typeof rawTools.schemaOf === 'function'
       ? rawTools.schemaOf(def, false)
       : { name: def.name, description: def.description ?? '', parameters: def.parameters ?? {} };
@@ -307,27 +338,28 @@ export async function buildCompleteInventory(ctx, targetScope, signal) {
       name: tName,
       description: schema.description ?? def.description ?? '',
       parameters: schema.parameters ?? def.parameters ?? {},
-      category: classifyTool(tName),
-      unlocked: INITIAL_TOOLS.has(tName),
+      category: classifyTool(tName, policy),
+      unlocked: policy.initialTools.has(tName),
     });
   }
 
   let skills = [];
+  const warnings = [];
   try {
-    let cwd;
-    try {
-      cwd = targetScope?.ctx ? await ctx.workingDirectory?.ensure(targetScope, signal) : undefined;
-    } catch {}
+    let cwd = targetScope ? await ctx.workingDirectory?.ensure(targetScope, signal) : ctx.workingDirectory?.defaultDirectory;
     if (!cwd) cwd = process.cwd();
     const listed = await ctx.skills?.list({ cwd, signal, scope: targetScope });
     skills = (listed || []).filter(s => s?.invocation?.modelInvocable !== false);
-  } catch {
+  } catch (error) {
+    signal?.throwIfAborted();
     skills = [];
+    warnings.push(`Skill discovery failed: ${error.message ?? String(error)}`);
   }
+  signal?.throwIfAborted();
 
   const categories = new Map();
 
-  for (const [catId, meta] of Object.entries(CATEGORY_META)) {
+  for (const [catId, meta] of Object.entries(policy.categories)) {
     categories.set(catId, {
       id: catId,
       kind: 'core',
@@ -342,7 +374,7 @@ export async function buildCompleteInventory(ctx, targetScope, signal) {
     id: 'skills',
     kind: 'skill',
     title: 'Domain Skills Repository (Skills)',
-    summary: 'Load complete domain workflows, coding standards, and best-practice instructions on demand (covering Office, Univer, Design, Browser Automation, Reverse Engineering, Research, Plugin Dev, fnOS, Memory, etc.).',
+    summary: 'Search and load domain workflows registered in the current scope.',
     tools: [],
     skills: [...skills],
   });
@@ -365,12 +397,12 @@ export async function buildCompleteInventory(ctx, targetScope, signal) {
           id: tool.category,
           kind: 'mcp',
           title: `MCP Server: ${server}`,
-          summary: KNOWN_MCP_DESCRIPTIONS[server] ?? `Tool collection from MCP server "${server}".`,
+          summary: policy.mcpDescriptions[server] ?? `Tool collection from MCP server "${server}".`,
           tools: [],
           skills: [],
         });
       } else {
-        const family = KNOWN_PLUGIN_FAMILIES.find(f => f.id === tool.category);
+        const family = policy.pluginFamilies.find(f => f.id === tool.category);
         categories.set(tool.category, {
           id: tool.category,
           kind: 'plugin',
@@ -390,14 +422,14 @@ export async function buildCompleteInventory(ctx, targetScope, signal) {
     }
   }
 
-  return { allToolsMap, skills, categories };
+  return { allToolsMap, skills, categories, policy, warnings };
 }
 
 /** Render a full markdown document describing all available callable capabilities in the harness. */
 export function renderCatalogMarkdown(inventory, options = {}) {
   const { isPtcMode = false, title = 'Diffusion Mode · Call Directory' } = options;
   const { allToolsMap, skills, categories } = inventory;
-  const initialList = [...INITIAL_TOOLS].filter(t => t !== 'structured_output' && t !== 'run_code');
+  const initialList = [...allToolsMap.values()].filter(t => t.category === 'initial').map(t => t.name);
   const totalTools = [...allToolsMap.values()].filter(t => t.category !== 'initial').length;
 
   const lines = [
@@ -410,11 +442,7 @@ export function renderCatalogMarkdown(inventory, options = {}) {
     `- **Total Capabilities in Environment**: **${totalTools}** extended tools + **${skills.length}** domain skills (Skills)`,
     '',
     '## ⚡ Quick Unlocks (Common Scenarios)',
-    '- 💻 **Standard Coding & Testing**: `call_directory({ names: ["core:file", "core:task"] })` (or shorthand `names: ["fs", "task"]`)',
-    '- 🤖 **Subagents & Concurrent Workflows**: `call_directory({ names: ["core:subagent"] })` (or shorthand `names: ["subagent"]`)',
-    '- 🌐 **Web Access & Presentation**: `call_directory({ names: ["core:web"] })` (or shorthand `names: ["web"]`)',
-    '- 🎨 **Domain Skills Repository**: `call_directory({ names: ["skills"] })`',
-    '- 🚀 **Full Standard Mode Unlock**: `call_directory({ names: ["*"] })`',
+    ...quickUnlockLines(inventory),
     '',
     '## 1. Progressive Disclosure Flow (Catalog → Lookup → Detail/Unlock → Unload)',
     '1. **Catalog (`catalog`)**: `call_directory()` — Overview capability categories and guidelines.',
@@ -455,6 +483,8 @@ export function renderCatalogMarkdown(inventory, options = {}) {
     }
   }
 
-  lines.push('', USAGE_REMINDER_FOOTER);
+  const reminder = inventory.policy?.usageReminder ?? USAGE_REMINDER_FOOTER;
+  if (reminder) lines.push('', reminder);
+  for (const warning of inventory.warnings ?? []) lines.push('', `⚠️ ${warning}`);
   return lines.join('\n');
 }

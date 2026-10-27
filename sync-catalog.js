@@ -21,9 +21,9 @@ console.log('- [skills] Domain Skills Repository (Loaded on demand from register
 console.log('- [mcp:*] External MCP Servers (Dynamically detected and categorized)');
 console.log('- [plugin:*] Feature Plugins (Dynamically detected by extension prefix)');
 
-console.log('\n--- Preset Verification ---');
-console.log('- Preset "diffusion" (Diffusion Mode - Standard Edition): Ready');
-console.log('- Preset "diffusion-ptc" (Diffusion Mode - PTC Edition): Ready');
+console.log('\n--- Verification Scope ---');
+console.log('Static architecture inspection only. No live DSH preset verification was performed.');
+console.log('Run npm test for local regression checks; validate Native/PTC mounting in a running DSH host.');
 
 if (existsSync(catalogMdFile)) {
   console.log(`\nFull documentation: ${catalogMdFile}`);

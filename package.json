@@ -27,7 +27,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "test": "node test-e2e-iteration.js",
+    "test": "node test-e2e-iteration.js && node --test test-regressions.js",
     "sync": "node sync-catalog.js"
   },
   "icon": "./icon.svg",

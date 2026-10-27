@@ -1,6 +1,6 @@
 # Diffusion Mode · Capability Catalog & Architecture Guide
 
-Diffusion Mode provides a progressive disclosure runtime for DeepSeek Harness (DSH). Instead of bloating the initial model context with hundreds of tool schemas and extensive instructions, Diffusion Mode boots in an ultra-lean initial surface and expands tools, skills, MCP servers, and feature plugins on demand.
+Diffusion Mode provides a progressive disclosure runtime for DeepSeek Harness (DSH). Instead of bloating the initial model context with hundreds of tool schemas and extensive instructions, Diffusion Mode boots with a configurable initial surface and expands registered tools, skills, MCP servers, and feature plugins on demand. This document is a static architecture guide, not a snapshot of installed capabilities; call `call_directory()` for the current session inventory.
 
 ---
 
@@ -35,7 +35,7 @@ The progressive expansion lifecycle consists of four lightweight phases:
    Inspects full parameter schemas and automatically mounts the requested tools or skills into the active session.
 4. **Dynamic Unload (`unload` / `reset`)**:  
    - `call_directory({ action: "unload", names: ["<name or category>"] })`: Selectively unloads heavyweight tools to shrink context.
-   - `call_directory({ action: "reset" })`: Resets the session back to the minimal initial state (Shell + `read_image` + `call_directory`).
+   - `call_directory({ action: "reset" })`: Resets tool visibility to the configured initial surface. Previously returned skill instructions remain in conversation history.
 
 ---
 
@@ -58,12 +58,24 @@ The progressive expansion lifecycle consists of four lightweight phases:
 Diffusion Mode dynamically discovers and organizes any external capabilities installed in the DSH profile:
 
 - **MCP Servers (`mcp:<server_name>`)**: Any tool registered with the prefix `mcp__<server>__` is automatically grouped under its corresponding MCP service, with server-specific system prompt sections gated until unlocked.
-- **Feature Plugins (`plugin:<plugin_name>`)**: Extended plugins installed via the DSH marketplace or profile are dynamically grouped by prefix and mountable on demand.
+- **Feature Plugins (`plugin:<prefix>`)**: Configured family rules take precedence; otherwise tools are grouped by the text before their first underscore. Names without a prefix fall back to `plugin:other`. Provider identity cannot be inferred reliably from tool names alone; use `pluginFamilies` to supply explicit mappings.
 
 ---
 
 ## 💡 Prompt Engineering & Context Economy
 
-1. **Subagent Delegation (`subagent`)**: For multi-file investigation, deep code reviews, or parallel subtasks, unlock `subagent` to delegate work rather than serializing all operations in the main session.
-2. **Domain Skills (`skills`)**: For specialized domain tasks (Office documents, UI design, security analysis, automation), always check and load the corresponding `skill` first to follow proven workflows.
+1. **Subagent Delegation (`subagent`)**: Inspect and unlock delegation tools when useful and permitted by the user and workspace instructions.
+2. **Domain Skills (`skills`)**: Search registered providers for relevant workflows. Skill dependencies use explicit `skillCompanions` mappings, not substring matching or fixed installation paths.
 3. **Context Pruning**: When completing large milestones, call `call_directory({ action: "unload", names: [...] })` to keep the context window lean and focused.
+
+
+## Configuration and State
+
+See [README configuration](README.md) for replaceable initial tools, categories, aliases, plugin rules, companion groups and prompt guidance.
+
+- `/runtime` and `/runtime-v2` export the same controller.
+- Each directory request reads the requesting scope directly. A host snapshot is never substituted for an agent inventory, and tools from a sample agent are not merged into other scopes.
+- Full unlock supports selective exclusions; Native and PTC directory result metadata persists unlock, unload and reset state.
+- Wildcard prefix expansion requires an explicit `*` for both mount and unload.
+- The optional host exporter listens for tool, skill and plugin events. It is disabled by default, resolves the current workspace on refresh, and refuses to overwrite unmanaged files.
+- `npm run sync` is static inspection only. `npm test` exercises mocked host contracts; actual DSH mounting remains a separate integration check.

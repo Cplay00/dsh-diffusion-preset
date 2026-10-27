@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { apply } from './runtime-v2.js';
 import { CATEGORY_ALIASES, normalizeTokenList } from './catalog-builder.js';
 
-console.log('=== Starting Diffusion Mode Iteration E2E Test Suite ===');
+console.log('=== Starting Diffusion Mode Mock Runtime Checks ===');
 
 // Test 1: Alias & Token Normalization
 assert.strictEqual(CATEGORY_ALIASES.fs, 'core:file');
@@ -88,7 +88,7 @@ const mockAgent = {
 const catalogRes = await registeredTool.execute({}, { agent: mockAgent });
 assert.strictEqual(catalogRes.stage, 'catalog');
 assert(catalogRes.report.includes('⚡ Quick Unlocks (Common Scenarios)'), 'Must include Quick Unlocks section');
-assert(catalogRes.report.includes('Active Guidance on Core Capabilities (Must Read: Subagents & Skills)'), 'Must include core reminder header');
+assert(catalogRes.report.includes('Capability Guidance (Subagents & Skills)'), 'Must include core reminder header');
 assert(!catalogRes.report.includes('serialize everything in the main session'), 'Footer must be concise');
 console.log('✓ Test 3: Catalog is clear, structured, and concise');
 
@@ -97,7 +97,7 @@ const lookupRes = await registeredTool.execute({ query: 'read' }, { agent: mockA
 assert.strictEqual(lookupRes.stage, 'lookup');
 assert(lookupRes.report.includes('read'), 'Must find read tool');
 assert(lookupRes.report.includes('Next Step: Mount Directly'), 'Must have direct mount prompt');
-assert(!lookupRes.report.includes('Active Guidance on Core Capabilities'), 'Lookup MUST NOT append repetitive footer');
+assert(!lookupRes.report.includes('Capability Guidance'), 'Lookup MUST NOT append repetitive footer');
 console.log('✓ Test 4: Lookup is concise and token-efficient');
 
 // Test 5: Detail Batch Unlock (Compact list, no huge parameters dump)
@@ -143,9 +143,9 @@ console.log('✓ Test 7: Dynamic tool unload and session reset passed');
 // Test 8: System Prompt Guide Inspection
 const promptGuide = registeredPrompt.text();
 assert(promptGuide.includes('Progressive Workflow'), 'Prompt guide should be titled cleanly');
-assert(promptGuide.includes('call_directory({ names: ["core:file", "core:task"] })'), 'Prompt guide should give quick unlocks');
+assert(promptGuide.includes('Inspect available categories'), 'Prompt guide should use available categories');
 const guideLines = promptGuide.split('\n').filter(l => l.trim().length > 0);
 assert(guideLines.length <= 25, `Guide should be concise (currently ${guideLines.length} lines)`);
 console.log(`✓ Test 8: System prompt guide is ultra-crisp (${guideLines.length} lines vs original 35+ lines)`);
 
-console.log('\n🎉 ALL 8 DIFFUSION ITERATION TESTS PASSED PERFECTLY!');
+console.log('\nAll 8 mock runtime checks passed.');

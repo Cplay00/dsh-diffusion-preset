@@ -26,7 +26,7 @@
 3. **极简模式与全量模式难以两全**：纯极简模式无法胜任复杂任务，而标准模式又过于臃肿。
 
 **扩散模式通过「调用目录 → 渐进展开 → 动态收敛」解决了这一困境：**
-- **初始极简**：回合起步时仅开放基础 Shell（Bash/PowerShell）、图片查看器及 `call_directory` 目录中枢，首轮 Prompt 减少 70%~85%；
+- **初始极简**：回合起步时仅开放基础 Shell（Bash/PowerShell）、图片查看器及 `call_directory` 目录中枢，减少首轮工具 Schema 占用（实际节省随环境与配置变化）；
 - **按需解锁**：模型或用户通过 `call_directory` 随时检索并挂载所需领域的工具或技能，伴生工具自动联动（如解锁 `subagent` 自动附带 `send_message`、`list_agents`）；
 - **一步直达**：支持快捷分类别名（如 `names: ["fs", "task"]`）或 `names: ["*"]` 一键完整展开为全量标准模式；
 - **动态收敛**：重型任务完成后，支持通过 `unload` 卸载特定工具或 `reset` 一键重置回极简状态，保持长程会话干爽。
@@ -43,7 +43,7 @@
 - 🔄 **动态卸载收敛**：
   - `call_directory({ action: "unload", names: [...] })`：阶段性任务结束后精准卸载，收缩上下文。
   - `call_directory({ action: "reset" })`：重置会话回极简原点。
-- 📡 **全生命周期实时同步**：内置守护机制，深度监听 DSH 运行时的工具增减、技能更新与 MCP 挂载，目录文档（`CATALOG.md`）毫秒级自同步。
+- 📡 **按当前会话发现**：每次目录调用都读取当前作用域内的工具与技能，避免复用其他会话的目录。宿主可显式开启文档导出，仓库内的 `CATALOG.md` 保留为静态架构说明。
 
 ---
 
@@ -77,6 +77,57 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 - `tavily` → `mcp:tavily`（Tavily 智能搜索与深度爬虫）
 - `rea` → `mcp:rea`（二进制逆向工程与安全分析）
 
+### ⚙️ 通用配置与兼容边界
+
+本项目是 **DSH 预设**，依赖 DSH 的工具、技能、作用域及会话事件协议；不宣称能直接运行于任意 Agent 框架。默认分类与已知服务别名用于兼容现有用法，不要求安装对应服务。
+
+将运行时选项放入 `dsh-diffusion-preset/runtime-v2` 插件的 `config`；旧入口 `/runtime` 使用同一实现。Native 与 PTC 预设各自配置，`mode` 分别保留 `native` 或 `ptc`。
+
+| 运行时选项 | 行为 |
+| :--- | :--- |
+| `initialTools` | 替换默认初始工具集。仅实际注册的工具会出现；`call_directory` 始终保留，PTC 还保留 `run_code` 与 `structured_output` 传输工具。 |
+| `categories` | 替换核心分类，格式为 `{ "core:custom": { "title": "Custom", "summary": "...", "tools": ["tool_name"] } }`。分类 ID 使用小写。 |
+| `aliases` | 替换别名映射；`{}` 清除默认别名。目标为分类 ID 或工具名称。 |
+| `pluginFamilies` | 替换已知插件规则，支持 `id`、`prefix`、`exact`（名称数组）、`title`、`summary`；`[]` 清除特判。其他带下划线的工具按首段前缀分组。 |
+| `mcpDescriptions` | 替换 MCP 服务说明映射。未知服务仍按 `mcp__<server>__<tool>` 命名发现。 |
+| `companionGroups` | 替换伴随工具组；`[]` 禁用。重叠组会递归展开。 |
+| `skillCompanions` | 按技能准确名称声明工具依赖，默认 `{}`。不会根据技能名称中的 `doc`、`ppt` 等片段猜测依赖。 |
+| `guide` | `false` 关闭运行时操作指引。 |
+| `usageReminder` | 自定义目录尾部提示，或用 `false` 关闭；默认提示不强制使用子智能体或技能。 |
+
+例如运行时配置：
+
+```yaml
+mode: native
+initialTools: [bash, pwsh, read_image]
+companionGroups: []
+skillCompanions:
+  my-report-skill: [read, write]
+guide: false
+usageReminder: false
+```
+
+集合和映射选项均为**整体替换**，不是增量合并；配置只选择已注册能力，不会安装工具或技能。技能来源完全使用 DSH 注册的 provider，不再探测固定的应用安装目录。
+
+工具前缀展开必须显式带 `*`，例如 `names: ["vendor_*"]`；普通工具名称精确匹配。完整解锁后仍能卸载单项，卸载状态会随目录调用结果写入 Native/PTC 会话日志。`reset` 重置工具可见性，不会删除已经进入对话历史的技能正文。
+
+#### 可选的宿主目录导出
+
+默认不向工作区写入文件。在宿主插件 `dsh-diffusion-preset` 的 `config` 中显式开启：
+
+```yaml
+exportCatalog: true
+catalogPath: Diffusion Mode Call Directory.md
+```
+
+`catalogPath` 可为绝对路径，或相对当前工作区的路径，父目录须已存在。每次刷新都会重新解析工作区。只覆盖带本插件生成标记的文件；已有普通文件保持不变并报告错误。导出反映**宿主作用域**，不会混入任意会话私有工具；会话完整目录请使用该会话的 `call_directory()`。宿主也支持上表的目录分类、初始工具及提示选项；两处配置互相独立。
+
+#### 验证范围
+
+- `npm test`：运行模拟 DSH 服务的回归测试，包括工具可见性、作用域隔离、日志恢复、Native/PTC 状态与文件导出保护。
+- `npm run sync`：仅打印静态架构信息，不连接正在运行的 DSH，也不表示预设已完成实机验证。
+- 真实 DSH 的工具 Schema、SDK 挂载、插件加载兼容性仍应在目标 DSH 版本中验证。
+
 ---
 
 <span id="english"></span>
@@ -92,11 +143,11 @@ Traditional AI agent workflows inject full schemas for dozens of tools and volum
 
 ### 🌟 Key Highlights
 
-- **Lightweight First-Turn Context**: Cuts initial system prompt tokens by 70%-85%.
+- **Lightweight First-Turn Context**: Reduces upfront tool schemas; actual token savings depend on the installed environment and configuration.
 - **One-Step Mounting**: Quickly mounts domain toolkits via aliases like `names: ["fs", "task"]` or expands completely via `names: ["*"]`.
 - **Dynamic Unloading**: Supports `action: "unload"` and `action: "reset"` to prune tokens during long-horizon sessions.
 - **Dual Preset Architectures**: Works out-of-the-box in both Native Function Calling and PTC (Programmable Tool Calling) environments.
-- **Auto-Sync Daemon**: Listens to live DSH runtime events to keep the service catalog consistently updated.
+- **Scoped Discovery**: Reads the requesting session’s current tools and skills on every directory call. Host catalog file export is opt-in and protects existing user files.
 
 ---
 
