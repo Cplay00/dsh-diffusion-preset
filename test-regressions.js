@@ -26,6 +26,8 @@ function harness(t, config = {}, options = {}) {
     register(def) { this.directory = def; definitions.set(def.name, def); }
   }
   const tools = new Tools();
+  if (options.ownView) tools.view = Tools.prototype.view.bind(tools);
+  if (options.inheritedView) Object.setPrototypeOf(tools, Object.create(Tools.prototype));
   const originalView = tools.view;
   const layer = {};
   if (options.scoped) tools.layers = {
@@ -164,6 +166,45 @@ test('controllers on the same prototype do not affect other tool service instanc
   const second = h.agent();
   assert(otherTools.view(second).visible.has('write'));
   assert(!otherTools.view(second).visible.has('read'));
+});
+
+for (const shape of ['ownView', 'inheritedView']) {
+  test(`${shape}: filtering hooks the actual view implementation and restores its descriptor`, async t => {
+    const h = harness(t, {}, { [shape]: true, mount: false });
+    const ownedBefore = Object.hasOwn(h.tools, 'view');
+    const prototype = Object.getPrototypeOf(h.tools);
+    const prototypeOwnedBefore = Object.hasOwn(prototype, 'view');
+    apply(h.ctx);
+    const agent = h.agent();
+    assert(!h.visible(agent).includes('write'));
+    await h.call(agent, { names: ['write'] });
+    assert(h.visible(agent).includes('write'));
+    h.dispose();
+    assert.equal(h.tools.view, h.originalView);
+    assert.equal(Object.hasOwn(h.tools, 'view'), ownedBefore);
+    assert.equal(Object.hasOwn(prototype, 'view'), prototypeOwnedBefore);
+  });
+}
+
+test('exact tool names take precedence over aliases during both mount and unload', async t => {
+  const h = harness(t, {}, { names: ['file', 'read', 'write'] });
+  const agent = h.agent();
+  await h.call(agent, { names: ['*'] });
+  assert.deepEqual((await h.call(agent, { action: 'unload', names: ['file'] })).unloaded, ['file']);
+  assert(h.visible(agent).includes('read'));
+  assert(h.visible(agent).includes('write'));
+  assert(!h.visible(agent).includes('file'));
+  assert.deepEqual((await h.call(agent, { names: ['file'] })).unlocked, ['file']);
+});
+
+test('directory state changes cannot be scheduled as concurrency-safe calls', t => {
+  const h = harness(t);
+  for (const args of [{ names: ['read'] }, { action: 'detail', category: 'fs' }, { action: 'unload', names: ['read'] }, { action: 'reset' }]) {
+    assert.equal(h.tools.directory.isConcurrencySafe(args), false);
+  }
+  for (const args of [{}, { query: 'read' }, { action: 'catalog' }, { action: 'lookup', names: ['read'] }]) {
+    assert.equal(h.tools.directory.isConcurrencySafe(args), true);
+  }
 });
 
 test('child agents inherit the parent exclusions after full unlock', async t => {

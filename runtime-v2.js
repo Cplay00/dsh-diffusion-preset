@@ -67,17 +67,22 @@ function expandCompanionTools(toolNames, allToolNames, groups) {
   return expanded;
 }
 
-/** Install or join the shared view hook on ToolRuntime.prototype. */
+/** Install or join the hook where this service actually defines its view. */
 function ensureViewHook(rawTools) {
-  let hostObj = Object.getPrototypeOf(rawTools);
-  if (!hostObj || typeof hostObj.view !== 'function') {
-    hostObj = rawTools;
+  let hostObj = rawTools;
+  while (hostObj && !Object.hasOwn(hostObj, 'view')) {
+    hostObj = Object.getPrototypeOf(hostObj);
   }
-  let hook = hostObj[VIEW_HOOK_SYM];
+  if (!hostObj || typeof rawTools.view !== 'function') {
+    throw new TypeError('Diffusion Mode requires the DSH tools.view(scope) API.');
+  }
+  let hook = Object.hasOwn(hostObj, VIEW_HOOK_SYM) ? hostObj[VIEW_HOOK_SYM] : undefined;
   if (!hook) {
+    const descriptor = Object.getOwnPropertyDescriptor(hostObj, 'view');
     const origView = hostObj.view;
     hook = {
       origView,
+      descriptor,
       bypass: 0,
       controllers: new Map(),
       findController(scope, service) {
@@ -94,7 +99,7 @@ function ensureViewHook(rawTools) {
       writable: true,
       enumerable: false,
     });
-    hostObj.view = function (targetScope) {
+    hook.view = function (targetScope) {
       const original = origView.call(this, targetScope);
       const base = { ...original, visible: new Map(original.visible) };
       if (hook.bypass > 0) return base;
@@ -102,6 +107,7 @@ function ensureViewHook(rawTools) {
       if (!controller) return base;
       return controller.filterView(targetScope, base);
     };
+    Object.defineProperty(hostObj, 'view', { ...descriptor, value: hook.view });
   }
   return {
     register(controller) {
@@ -109,7 +115,7 @@ function ensureViewHook(rawTools) {
       return () => {
         hook.controllers.delete(controller);
         if (hook.controllers.size === 0) {
-          hostObj.view = hook.origView;
+          if (hostObj.view === hook.view) Object.defineProperty(hostObj, 'view', hook.descriptor);
           delete hostObj[VIEW_HOOK_SYM];
         }
       };
@@ -660,17 +666,17 @@ export function apply(ctx, config = {}) {
       for (const token of requestedTokens) {
         const lower = token.toLowerCase();
         const resolved = CATEGORY_ALIASES[lower] ?? lower;
-        if (categories.has(resolved)) {
-          const cat = categories.get(resolved);
-          for (const t of cat.tools) toolsToUnload.add(t.name);
-          continue;
-        }
         if (allToolsMap.has(token)) {
           toolsToUnload.add(token);
           continue;
         }
         if (allToolsMap.has(resolved)) {
           toolsToUnload.add(resolved);
+          continue;
+        }
+        if (categories.has(resolved)) {
+          const cat = categories.get(resolved);
+          for (const t of cat.tools) toolsToUnload.add(t.name);
           continue;
         }
         for (const [catId, cat] of categories) {
@@ -791,7 +797,10 @@ export function apply(ctx, config = {}) {
         diffusionSkills: value.loadedSkills ?? [],
       }),
     },
-    isConcurrencySafe: () => true,
+    isConcurrencySafe: (args = {}) => {
+      if (args.action) return args.action === 'catalog' || args.action === 'lookup';
+      return !args.unload && normalizeTokenList(args.names).length === 0;
+    },
     presentCall(args) {
       const stage =
         args?.action === 'reset'
@@ -897,7 +906,7 @@ export function apply(ctx, config = {}) {
         '   - 🎨 Domain Tasks & Skills: Search via `call_directory({ query: "keyword" })` for relevant registered skills',
         '   - 🚀 Full Standard Mode: `call_directory({ names: ["*"] })` to expand all tools',
         '2. **Explore & Search**: Overview categories with `call_directory()`; search tools or skills by category or keyword with `call_directory({ query: "..." })`.',
-        '3. **Dynamic Pruning (Unload)**: When a heavy milestone completes, reclaim context window by calling `call_directory({ action: "unload", names: [...] })` or `{ action: "reset" }`.',
+        '3. **Dynamic Pruning (Unload)**: Remove tool definitions from subsequent requests with `call_directory({ action: "unload", names: [...] })` or `{ action: "reset" }`. Existing conversation history is retained.',
       ].join('\n'),
   });
 

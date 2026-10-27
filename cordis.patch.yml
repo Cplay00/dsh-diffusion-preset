@@ -129,6 +129,10 @@
           - id: tool-plugin-market
             name: '@deepseek-ai/dsh-plugin-market/tools'
             disabled: !!js "!ctx.get('profileContext')"
+          - id: tool-presentation
+            name: '@deepseek-ai/dsh-agent-tool-presentation'
+            config:
+              mode: native
           - id: diffusion-controller
             name: dsh-diffusion-preset/runtime-v2
             config:
