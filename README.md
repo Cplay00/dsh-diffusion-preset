@@ -99,6 +99,18 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 
 文件读取、搜索和修改优先使用适合的专用工具；Git、构建、测试等 CLI 操作仍走终端。同一任务可以混用两种方式，例如用 `read` / `edit` 修改文件，再用终端执行 `git diff`。找不到适合的注册工具，或工具无法表达当前操作时，再说明原因并选择回退方式。
 
+#### 按分类获取操作引导
+
+不知道一类工具该如何使用时，先浏览对应分类，例如向 `call_directory` 传入：
+
+```json
+{"action":"lookup","category":"core:search"}
+```
+
+返回的 **Category Workflow** 会说明该类工具的操作顺序和选择原则。例如文件搜索先定位路径、再搜索内容、最后读取相关范围；浏览器操作先确认页面状态、再交互并验证；后台任务、终端会话和智能体则各用自己的状态与控制通道。
+
+14 个内置分类，以及已知插件与 MCP 分类都有对应引导；未知服务和自定义分类会使用通用引导。说明只针对当前作用域实际存在的分类：单一分类的检索或挂载结果按需展开，跨多个分类的宽泛结果不附带整套流程。检索引导不挂载工具，也不会安装缺失服务；模型仍按具体任务选择精确工具，再遵循实际参数 Schema 调用。
+
 ---
 
 #### 🎭 两种模式如何调用？Native vs PTC 对照
@@ -264,14 +276,15 @@ Native 与 PTC 预设均显式声明工具呈现模式，不受宿主默认模�
 | 运行时选项 | 行为 |
 | :--- | :--- |
 | `initialTools` | 替换默认初始工具集。仅实际注册的工具会出现；`call_directory` 始终保留，PTC 还保留 `run_code` 与 `structured_output` 传输工具。 |
-| `categories` | 替换核心分类，格式为 `{ "core:custom": { "title": "Custom", "summary": "...", "tools": ["tool_name"] } }`。分类 ID 使用小写。 |
+| `categories` | 替换核心分类，格式为 `{ "core:custom": { "title": "Custom", "summary": "...", "guidance": "操作流程，可省略", "tools": ["tool_name"] } }`。分类 ID 使用小写。 |
 | `aliases` | 替换别名映射；`{}` 清除默认别名。目标为分类 ID 或工具名称。 |
-| `pluginFamilies` | 替换已知插件规则，支持 `id`、`prefix`、`exact`（名称数组）、`title`、`summary`；`[]` 清除特判。其他带下划线的工具按首段前缀分组。 |
+| `pluginFamilies` | 替换已知插件规则，支持 `id`、`prefix`、`exact`（名称数组）、`title`、`summary`、可选 `guidance`；`[]` 清除特判。其他带下划线的工具按首段前缀分组。 |
 | `mcpDescriptions` | 替换 MCP 服务说明映射。未知服务仍按 `mcp__<server>__<tool>` 命名发现。 |
+| `categoryGuidance` | 按完整分类 ID 覆盖操作引导，例如 `{ "mcp:my-server": "先检查目标，再选择操作并验证结果" }`；单项设为 `false` 或空字符串可关闭该分类引导，整体 `false` 关闭所有分类引导。不会创建分类或挂载工具。 |
 | `companionGroups` | 默认 `[]`。显式配置后才展开伴随工具组；重叠组会递归展开，可能扩大挂载范围。 |
 | `skillCompanions` | 默认 `{}`。显式声明技能对应的依赖，如 `{ "my-skill": ["read"] }`；分类依赖会挂载整类。 |
 | `inferSkillCompanions` | 默认 `false`。设为 `true` 后按技能领域关键词推断依赖，可能展开整个领域；精准调用场景建议保持关闭。 |
-| `guide` | `false` 关闭运行时操作指引。 |
+| `guide` | `false` 关闭系统提示中的运行时操作指引；目录中的分类流程由 `categoryGuidance` 独立控制。 |
 | `usageReminder` | 自定义目录尾部提示，或用 `false` 关闭；默认提示不强制使用子智能体或技能。 |
 
 例如运行时配置：
@@ -348,6 +361,8 @@ Select **"Diffusion Mode"** or **"Diffusion Mode (PTC)"** when launching a sessi
 In Native mode, call the registered `call_directory` tool with a JSON argument object. In PTC mode, call `run_code` and execute `await tools.call_directory(args)` inside its `code`; use newly mounted bindings in the **next** `run_code` call.
 
 Use explicit actions for clarity: `{"action":"lookup","query":"read file"}` discovers candidates; `{"action":"detail","names":["read"]}` mounts the selected tool. Then invoke `read` separately using its actual schema. Mounting does not execute a business operation. Categories and wildcards in `names` deliberately select whole sets; choose exact names for precise mounting and unloading.
+
+Focused single-category lookup/mount results include a **Category Workflow** recipe. Core tools and known plugin/MCP families have specific recipes; unknown or custom categories fall back to their registered contracts. Broad mixed results keep these recipes collapsed. Customize them with `guidance` metadata or `categoryGuidance` overrides, or disable all recipes with `categoryGuidance: false`; none of these options mounts tools or installs services.
 
 If `action` is omitted, non-empty `names` selects `detail`, otherwise non-empty `query` or `category` selects `lookup`, otherwise `catalog`. An explicit action takes precedence. Read `report` for unmatched names, ambiguity and skill failures; a successful directory call does not guarantee every requested name matched. See the [full reference](#call-directory) for parameters and examples.
 

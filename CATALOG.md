@@ -89,6 +89,8 @@ See [README configuration](README.md) for replaceable initial tools, categories,
 
 - `/runtime` and `/runtime-v2` export the same controller.
 - Each directory request reads the requesting scope directly. A host snapshot is never substituted for an agent inventory, and tools from a sample agent are not merged into other scopes.
+- Core categories and known plugin/MCP families include operation recipes. Focused single-category lookup/mount results reveal the relevant recipe; broad mixed results and the initial prompt do not expand every workflow.
+- Unknown services and custom categories receive generic contract-based guidance. Optional `guidance` metadata and `categoryGuidance` overrides customize it without inventing tools, installing services or changing visibility; `categoryGuidance: false` disables recipes.
 - Full unlock supports selective exclusions; Native and PTC directory result metadata persists unlock, unload and reset state.
 - Wildcard prefix expansion requires an explicit `*` for both mount and unload.
 - The optional host exporter listens for tool, skill and plugin events. It is disabled by default, resolves the current workspace on refresh, and refuses to overwrite unmanaged files.

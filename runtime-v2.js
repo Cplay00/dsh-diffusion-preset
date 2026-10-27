@@ -1,7 +1,7 @@
 import {
   buildCompleteInventory, createCatalogPolicy, firstLineSummary,
   getScopeOf, normalizeTokenList, quickUnlockLines, renderSkillContent, unwrapService,
-  inferSkillCompanions, classifyTool,
+  inferSkillCompanions, classifyTool, getCategoryGuidance,
 } from './catalog-builder.js';
 
 export const name = 'diffusion-controller';
@@ -309,6 +309,15 @@ export function apply(ctx, config = {}) {
     return inventory;
   }
 
+  /** Expand a recipe only for a focused category, never for a broad result page. */
+  function categoryWorkflowLines(inventory, categoryIds) {
+    const ids = [...new Set(categoryIds)].filter(id => inventory.categories.has(id));
+    if (ids.length !== 1) return [];
+    const category = inventory.categories.get(ids[0]);
+    const guidance = getCategoryGuidance(category, policy);
+    return guidance ? ['', '## Category Workflow', `- \`${category.id}\`: ${guidance}`] : [];
+  }
+
   /** Stage 1: Render the top-level categorized directory + usage reminder footer. */
   function renderCatalogStage(inventory, agentOrScope) {
     const { allToolsMap, skills, categories } = inventory;
@@ -514,6 +523,7 @@ const QUERY_SYNONYMS = {
       lines.push('', `No items on this page (offset: ${offset}, total matches: ${matches.length}). Retry with offset: 0 or a smaller offset.`);
       return lines.join('\n');
     } else {
+      lines.push(...categoryWorkflowLines(inventory, matches.map(item => item.kind === 'skill' ? 'skills' : item.category)));
       lines.push(`- Showing ${offset + 1}-${offset + page.length} of ${matches.length} matches.`, '', '## Candidates');
       for (const item of page) {
         const badge = item.kind === 'skill' ? '[Skill]' : item.unlocked ? '[Unlocked]' : '[Locked]';
@@ -735,6 +745,7 @@ const QUERY_SYNONYMS = {
     }
 
     const detailedList = [...finalTools].map(tName => allToolsMap.get(tName)).filter(Boolean);
+    lines.push(...categoryWorkflowLines(inventory, detailedList.map(tool => tool.category)));
     if (detailedList.length > 0) {
       if (detailedList.length === 1) {
         const tool = detailedList[0];
@@ -890,7 +901,7 @@ const QUERY_SYNONYMS = {
   ctx.tools.register({
     name: 'call_directory',
     description:
-      'Discover dedicated tools before substituting shell commands or raw APIs for supported file, search, edit or service operations. Use "lookup" to search tools/skills, "detail" with exact names to mount tools or load skill guidance, then call the target separately. Reuse available tools. Prefer explicit actions.',
+      'Discover dedicated tools before substituting shell commands or raw APIs for supported operations. Use "lookup" to find tools/skills and category workflows, "detail" with exact names to mount tools or load skill guidance, then call the target separately. Reuse available tools. Prefer explicit actions.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -1053,7 +1064,7 @@ const QUERY_SYNONYMS = {
         '',
         'The current session runs in **Diffusion Mode**, starting with minimal essential tools and progressively expanding on demand to keep context lean and focused.',
         '',
-        '**Choose per operation**: Prefer a registered dedicated tool for supported work, including file reading, searching and editing. Discover and mount it before replacing it with shell commands, Node/Python scripts or raw filesystem APIs. Use a shell, when available, for actual CLI work such as Git, builds and tests, or operations without a suitable registered tool. A CLI step does not make shell the right route for the task\'s file operations. Search one operation per query: its terms constrain a single candidate. If no suitable tool is found or its contract cannot express the operation, use the appropriate fallback and briefly state why.',
+        '**Choose per operation**: Prefer registered dedicated tools for supported file, web/browser, remote/service, media/memory and session/task work. Discover and mount them before using shell commands or raw APIs as substitutes. Use a shell, when available, for actual CLI work such as Git, builds and tests, or operations without a suitable registered tool. A CLI step does not make shell the right route for the task\'s other operations. Search one operation per query: its terms constrain a single candidate. When category workflow guidance is returned, follow it alongside the actual tool schema. Use a fallback only within the same requested scope, permissions and data granularity; otherwise explain the capability limit. Do not broaden a limited query into private storage inspection.',
         '',
         '## ⚡ Operating Guidelines (Search First Recommended)',
         `1. **Search First (Recommended)**: Reuse available tools and exact names already verified in this session. For an unknown capability, search a concrete operation with \`${directoryCall}({ action: "lookup", query: "<operation>" })\`; combine terms to narrow results. Inspect available categories with \`${directoryCall}({ action: "catalog" })\`; \`${directoryCall}({ action: "lookup", category: "<id>" })\` lists candidates without mounting.`,
