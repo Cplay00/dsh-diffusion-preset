@@ -1309,7 +1309,7 @@ export function apply(ctx, config) {
                 : args?.category || args?.query || 'all';
       return {
         card: 'generic',
-        title: `Call Directory (${stage}): ${target}`,
+        title: `调用目录 (${stage}): ${target}`,
         kind: stage === 'unload' || stage === 'reset' ? 'status' : 'search',
         rawInput: JSON.stringify(args ?? {}),
       };

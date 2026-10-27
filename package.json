@@ -2,7 +2,7 @@
   "name": "dsh-diffusion-preset",
   "version": "1.1.0",
   "type": "module",
-  "description": "Diffusion Mode (扩散模式) agent preset and progressive call directory tool for DeepSeek Harness.",
+  "description": "扩散模式 (Diffusion Mode) Agent 预设与渐进式调用目录，保持极简初始上下文并按需解锁工具与技能。",
   "keywords": [
     "dsh",
     "deepseek-harness",
