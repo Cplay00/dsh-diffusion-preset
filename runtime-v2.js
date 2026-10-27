@@ -1089,6 +1089,7 @@ const QUERY_SYNONYMS = {
     text: context =>
       [
         `# Diffusion Mode · ${isPtcMode ? 'PTC' : 'Native'}`,
+        `**For more tools or content sources, use ${directoryCall} FIRST.** Initial tools are a subset; discover the needed tools or skills.`,
         'Discover dedicated tools before shell/raw I/O substitutes; locked is not missing. Shell suits Git/build/test or unsupported operations. Keep scope, permissions and data granularity; report limits, never guess private stores.',
         `Search First (Recommended): one unknown operation → ${directoryCall}({query:"..."}) (terms AND); select by fit → ${directoryCall}({names:["exact"]}). Reuse tools; browse a category once for related operations and mount exact names together. Category lookup only browses; category/* in names mounts whole sets. skill:<name> loads guidance.`,
         isPtcMode
