@@ -131,7 +131,7 @@ async function runPresetVerification(ctx, agentPresets) {
         initialCallableSurface: initialSdk,
         catalogStageOk:
           catalogRes.stage === 'catalog' &&
-          catalogRes.report.includes('核心能力主动使用说明（必读：子智能体与技能）'),
+          catalogRes.report.includes('Active Guidance on Core Capabilities (Must Read: Subagents & Skills)'),
         lookupSubagentOk:
           lookupSubagentRes.stage === 'lookup' &&
           lookupSubagentRes.report.includes('subagent_fork'),
@@ -237,7 +237,7 @@ export function apply(ctx) {
         };
 
         const mdContent = renderCatalogMarkdown(inventory, {
-          title: '扩散模式 · 调用目录 (实时动态同步版)',
+          title: 'Diffusion Mode · Call Directory (Live Dynamic Sync)',
           isPtcMode: false,
         });
 
@@ -247,9 +247,10 @@ export function apply(ctx) {
           writeFileSync(join(PACKAGE_DIR, 'CATALOG.md'), mdContent, 'utf8');
         } catch {}
 
-        // 2. Write workspace-root 扩散模式调用目录.md
+        // 2. Write workspace-root Call Directory markdown files
         try {
           if (existsSync(workspaceDir)) {
+            writeFileSync(join(workspaceDir, 'Diffusion Mode Call Directory.md'), mdContent, 'utf8');
             writeFileSync(join(workspaceDir, '扩散模式调用目录.md'), mdContent, 'utf8');
           }
         } catch {}

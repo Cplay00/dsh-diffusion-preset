@@ -39,13 +39,13 @@ const COMPANION_GROUPS = [
 /** Static metadata for core categories and known plugin/MCP families. */
 const CATEGORY_META = {
   'core:file': {
-    title: '文件读写与代码搜索 (Core File & Search)',
-    summary: '读取、创建、精确编辑文本文件，按路径通配符 (glob) 或正则内容 (grep) 搜索代码，以及切换工作目录。',
+    title: 'File Operations & Code Search (Core File & Search)',
+    summary: 'Read, create, edit files precisely, search code with glob patterns or ripgrep regex, and change working directory.',
     tools: new Set(['read', 'write', 'edit', 'glob', 'grep', 'working_directory', 'ops_read_files', 'ops_discover_tools']),
   },
   'core:subagent': {
-    title: '子智能体委派、工作流与团队协作 (Subagent, Workflow & Team)',
-    summary: '派发独立或继承上下文的子智能体 (subagent / subagent_fork)、运行并发编排脚本 (workflow)、Ralph 迭代循环及多智能体团队协作。',
+    title: 'Subagent Delegation, Workflows & Teammates (Subagent, Workflow & Team)',
+    summary: 'Spawn fresh or forked subagents (subagent / subagent_fork), execute concurrent orchestration scripts (workflow), run Ralph iteration loops, and collaborate in agent teams.',
     tools: new Set([
       'subagent', 'subagent_fork', 'send_message', 'interrupt_agent', 'list_agents',
       'workflow', 'ralph',
@@ -53,13 +53,13 @@ const CATEGORY_META = {
     ]),
   },
   'core:skill': {
-    title: '技能加载器与工作区依赖 (Skill Loader & Runtime Dependencies)',
-    summary: '加载专业领域技能完整指令 (skill)，以及获取内置 Python/Node/pnpm 与 Office 依赖路径 (load_workspace_dependencies)。',
+    title: 'Skill Loader & Runtime Dependencies (Skill Loader & Runtime Dependencies)',
+    summary: 'Load domain skill instructions (skill), and resolve built-in Python/Node/pnpm and Office runtime paths (load_workspace_dependencies).',
     tools: new Set(['skill', 'load_workspace_dependencies']),
   },
   'core:task': {
-    title: '任务规划、长程目标、澄清提问与后台作业 (Task, Goal, Question, Jobs & Schedule)',
-    summary: '管理多步任务清单 (todo_write)、向用户提问确认 (ask_user_question)、提交规划审批 (exit_plan_mode)、长程目标 (goal) 与后台任务/定时提醒。',
+    title: 'Task Planning, Long-running Goals, Clarification & Background Jobs (Task, Goal, Question, Jobs & Schedule)',
+    summary: 'Manage multi-step task list (todo_write), ask user questions for clarification (ask_user_question), submit plan review (exit_plan_mode), track long-running goals (goal), and manage background jobs/schedules.',
     tools: new Set([
       'todo_write', 'ask_user_question', 'exit_plan_mode',
       'create_goal', 'get_goal', 'update_goal',
@@ -68,13 +68,13 @@ const CATEGORY_META = {
     ]),
   },
   'core:web': {
-    title: '联网搜索、网页抓取与成果交付 (Web Search/Fetch & Present)',
-    summary: '执行实时联网搜索 (web_search)、抓取指定 URL 网页内容 (web_fetch)，以及向用户展示最终交付文件卡片 (present)。',
+    title: 'Web Search, Fetch & Artifact Presentation (Web Search/Fetch & Present)',
+    summary: 'Perform live web searches (web_search), fetch web pages by URL (web_fetch), and present finished deliverable cards (present).',
     tools: new Set(['web_search', 'web_fetch', 'present']),
   },
   'core:dev': {
-    title: '持久终端、历史会话检索、Worktree 与插件管理 (Terminal, Session, Worktree & Cordis)',
-    summary: '操作持久化交互终端 (terminal_*)、检索历史会话事件 (session_*)、创建 Git Worktree，以及自省/管理 Cordis 插件与预设。',
+    title: 'Persistent Terminals, Session Search, Worktrees & Cordis (Terminal, Session, Worktree & Cordis)',
+    summary: 'Interact with persistent terminal shells (terminal_*), search historical session events (session_*), create Git worktrees, and inspect/manage Cordis plugins and presets.',
     tools: new Set([
       'terminal_open', 'terminal_send', 'terminal_read', 'terminal_signal', 'terminal_close', 'terminal_list',
       'session_search', 'session_trace', 'session_event_search', 'session_event_read', 'session_event_trace',
@@ -84,50 +84,46 @@ const CATEGORY_META = {
 };
 
 const KNOWN_MCP_DESCRIPTIONS = {
-  'open-design': 'OpenDesign 本地与云端设计工作台：网页 UI/UX、交互原型、幻灯片演示、设计系统生成与制品读写。',
-  'rea': 'Reverse Engineer Anything (REA) 逆向工程：二进制 (ELF/PE/Mach-O/APK/WASM/固件)、JS 包与浏览器运行时的静态/动态分析。',
-  'tavily': 'Tavily AI 联网检索：面向 LLM 优化的实时网页搜索 (search)、正文提取 (extract)、全站爬取 (crawl/map) 与深度调研 (research)。',
-  'wincu': 'Windows Computer Use & 浏览器自动化：优先通过浏览器通道操作网页标签页，或通过桌面 UIA/截图/OCR 控制本地 Windows 应用。',
-  'openviking': 'OpenViking 跨会话持久记忆与技能存储服务。',
+  'open-design': 'OpenDesign workspace: Web UI/UX, interactive prototypes, slide presentations, design system generation, and artifact read/write.',
+  'rea': 'Reverse Engineer Anything (REA): Binary (ELF/PE/Mach-O/APK/WASM/firmware), JS bundles, and browser runtime static/dynamic analysis.',
+  'tavily': 'Tavily AI Search: LLM-optimized real-time web search, content extraction, full-site crawl/map, and deep research.',
+  'wincu': 'Windows Computer Use & Browser Automation: Control browser tabs, or automate Windows desktop apps via UIA, screenshots, and OCR.',
+  'openviking': 'OpenViking cross-session persistent memory and skill storage service.',
 };
 
 const KNOWN_PLUGIN_FAMILIES = [
   {
     id: 'plugin:univer',
     prefix: 'univer_',
-    title: 'Univer 办公文档与画板套件 (dsh-univer-office)',
-    summary: '创建、检查、导入导出、编译 SVG 幻灯片、渲染截图、打印 PDF 及通过 Facade API 操作 .univer 表格/文档/幻灯片/多维表/画板。',
+    title: 'Univer Office & Canvas Suite (dsh-univer-office)',
+    summary: 'Create, inspect, import/export, compile SVG slides, render screenshots, export PDF, and automate .univer sheets/docs/slides/canvas via Facade API.',
   },
   {
     id: 'plugin:ssh',
     prefix: 'ssh_',
-    title: 'SSH 远程主机与集群管理 (@linxin666/dsh-ssh)',
-    summary: '列出已配置 SSH 主机、远程执行命令 (ssh_exec)、集群并发执行 (ssh_cluster)、上传下载文件与管理本地端口转发隧道。',
+    title: 'SSH Remote Host & Cluster Manager (@linxin666/dsh-ssh)',
+    summary: 'List configured SSH hosts, execute remote commands (ssh_exec), run cluster-wide commands (ssh_cluster), transfer files, and manage port-forwarding tunnels.',
   },
   {
     id: 'plugin:ppt-fusion',
     prefix: 'dsh_ppt_',
-    title: 'DSH 融合 PPT 预览与评审 (dsh-ppt-flashmade)',
-    summary: '在对话内直接预览融合 PPT 幻灯片 (dsh_ppt_preview)、生成草稿提案卡片 (dsh_ppt_propose) 及挂载渲染图进行视觉自检 (dsh_ppt_review)。',
+    title: 'DSH PPT Fusion Preview & Review (dsh-ppt-flashmade)',
+    summary: 'Preview PPT slides inside conversation (dsh_ppt_preview), generate draft proposals (dsh_ppt_propose), and mount rendered slides for visual review (dsh_ppt_review).',
   },
   {
     id: 'plugin:sidebar',
     exact: new Set(['sidebar_open']),
-    title: '右侧边栏联动插件 (dsh-better-sidebar)',
-    summary: '在当前会话右侧边栏编辑器、文件树或内置浏览器中直接打开本地文件、目录或 HTTP(S) 网页 (sidebar_open)。',
+    title: 'Right Sidebar Integration (dsh-better-sidebar)',
+    summary: 'Open local files, directories, or HTTP(S) web pages directly inside the right sidebar editor, file tree, or embedded browser (sidebar_open).',
   },
 ];
 
 /** Concise footer reminder placed at the end of directory outputs (focused on Subagent & Skill). */
 const USAGE_REMINDER_FOOTER = [
   '---',
-  '### 💡 核心能力主动使用说明（必读：子智能体与技能）',
-  '1. **子智能体 (`subagent` / `subagent_fork`) — 复杂或可并行任务请主动拆解委派**：',
-  '   - 遇到**多文件/跨目录探索、独立模块分析、多源信息调研或代码审查**时，切勿在主会话中单线程串行堆叠所有操作（既缓慢又污染主上下文）。',
-  '   - 请通过 `call_directory({ action: "detail", names: ["subagent", "subagent_fork"] })` 解锁子智能体（全新独立任务用 `subagent`，需继承当前已完成对话上下文用 `subagent_fork`），并在同一回复中并行发起多个子智能体协同处理。',
-  '2. **技能 (`skill`) — 垂直领域任务必先检索并加载技能**：',
-  '   - 遇到**特定领域任务**（如 Word/PDF/PPT/Excel 办公文档、Univer、网页浏览与前端测试、UI/UX 设计、二进制逆向、深度联网检索、飞牛 NAS、Cordis 插件/预设配置、历史记忆等）时，**切勿凭通用经验盲目手写脚本**。',
-  '   - 请先用 `call_directory({ action: "lookup", category: "skills", query: "<关键词>" })` 查找匹配技能，再用 `call_directory({ action: "detail", names: ["<技能名>"] })` 加载完整技能指南并严格遵循其规范流程。',
+  '### 💡 Active Guidance on Core Capabilities (Must Read: Subagents & Skills)',
+  '1. **Subagents (`subagent`)**: For multi-file/cross-module exploration or parallelizable tasks, unlock `subagent` immediately to delegate; avoid serializing everything in the main session.',
+  '2. **Domain Skills (`skills`)**: For specialized domain tasks (Office documents, UI design, reverse engineering, browser automation, etc.), always load the corresponding `skill` first instead of writing ad-hoc scripts.',
 ].join('\n');
 
 function unwrapService(service) {
@@ -241,11 +237,11 @@ function classifyTool(toolName) {
 
 /** Format a JSON Schema parameter property for human/LLM-readable detail output. */
 function formatParameterSchema(parameters) {
-  if (!parameters || typeof parameters !== 'object') return '  (无参数)';
+  if (!parameters || typeof parameters !== 'object') return '  (No parameters)';
   const props = parameters.properties ?? {};
   const required = new Set(Array.isArray(parameters.required) ? parameters.required : []);
   const keys = Object.keys(props);
-  if (keys.length === 0) return '  (无参数 `{}`)';
+  if (keys.length === 0) return '  (No parameters `{}`)';
   const lines = [];
   for (const key of keys) {
     const spec = props[key] ?? {};
@@ -262,14 +258,14 @@ function formatParameterSchema(parameters) {
       typeStr = 'oneOf<...>';
     }
     const desc = spec.description ? ` — ${String(spec.description).replace(/\s+/g, ' ').trim()}` : '';
-    lines.push(`  - \`${key}\` (${typeStr}, ${isReq ? '必填' : '可选'})${desc}`);
+    lines.push(`  - \`${key}\` (${typeStr}, ${isReq ? 'required' : 'optional'})${desc}`);
     if (spec.type === 'object' && spec.properties) {
       const subReq = new Set(Array.isArray(spec.required) ? spec.required : []);
       for (const [subKey, subSpec] of Object.entries(spec.properties)) {
         const subType = subSpec?.type ?? 'any';
         const subIsReq = subReq.has(subKey) || subSpec?.required === true;
         const subDesc = subSpec?.description ? ` — ${String(subSpec.description).replace(/\s+/g, ' ').trim()}` : '';
-        lines.push(`      • \`${key}.${subKey}\` (${subType}, ${subIsReq ? '必填' : '可选'})${subDesc}`);
+        lines.push(`      • \`${key}.${subKey}\` (${subType}, ${subIsReq ? 'required' : 'optional'})${subDesc}`);
       }
     }
   }
@@ -722,8 +718,8 @@ export function apply(ctx, config = {}) {
     categories.set('skills', {
       id: 'skills',
       kind: 'skill',
-      title: '专业领域技能库 (Skills)',
-      summary: '按需加载特定领域的完整工作流、脚本规范与最佳实践指令（涵盖 Office/Univer/设计/浏览器控制/逆向/搜索调研/插件开发/飞牛OS/记忆等）。',
+      title: 'Domain Skills Repository (Skills)',
+      summary: 'Load complete domain workflows, coding standards, and best-practice instructions on demand (covering Office, Univer, Design, Browser Automation, Reverse Engineering, Research, Plugin Dev, fnOS, Memory, etc.).',
       tools: [],
       skills: [...skills],
     });
@@ -735,8 +731,8 @@ export function apply(ctx, config = {}) {
           categories.set('mcp:resources', {
             id: 'mcp:resources',
             kind: 'mcp',
-            title: 'MCP 资源读取工具 (MCP Resources)',
-            summary: '列出并读取各 MCP 服务端提供的 URI 资源与参数化资源模板。',
+            title: 'MCP Resource Tools (MCP Resources)',
+            summary: 'List and read URI resources and parameterized resource templates provided by MCP servers.',
             tools: [],
             skills: [],
           });
@@ -745,8 +741,8 @@ export function apply(ctx, config = {}) {
           categories.set(tool.category, {
             id: tool.category,
             kind: 'mcp',
-            title: `MCP 服务: ${server}`,
-            summary: KNOWN_MCP_DESCRIPTIONS[server] ?? `来自 MCP 服务端 "${server}" 的工具集合。`,
+            title: `MCP Server: ${server}`,
+            summary: KNOWN_MCP_DESCRIPTIONS[server] ?? `Tool collection from MCP server "${server}".`,
             tools: [],
             skills: [],
           });
@@ -755,8 +751,8 @@ export function apply(ctx, config = {}) {
           categories.set(tool.category, {
             id: tool.category,
             kind: 'plugin',
-            title: family?.title ?? `扩展插件工具 (${tool.category})`,
-            summary: family?.summary ?? '当前 Profile 安装的扩展插件工具。',
+            title: family?.title ?? `Feature Plugin Tools (${tool.category})`,
+            summary: family?.summary ?? 'Extended plugin tools installed in the current profile.',
             tools: [],
             skills: [],
           });
@@ -783,24 +779,24 @@ export function apply(ctx, config = {}) {
     const unlockedCount = [...allToolsMap.values()].filter(t => t.category !== 'initial' && t.unlocked).length;
 
     const lines = [
-      `# 扩散模式 · 调用目录 (${isPtcMode ? 'PTC 模式' : '标准模式'})`,
+      `# Diffusion Mode · Call Directory (${isPtcMode ? 'PTC Mode' : 'Standard Mode'})`,
       '',
-      `- **当前默认已开放基础工具**：${initialList.map(t => `\`${t}\``).join(', ')}`,
-      `- **可扩展能力总览**：共 **${totalTools}** 个扩展工具（已解锁 **${unlockedCount}** 个）+ **${skills.length}** 个专业技能 (Skills)`,
+      `- **Currently Available Basic Tools**: ${initialList.map(t => `\`${t}\``).join(', ')}`,
+      `- **Total Capabilities in Environment**: **${totalTools}** extended tools (**${unlockedCount}** unlocked) + **${skills.length}** domain skills (Skills)`,
       '',
-      '## 一、渐进调用三步流程（调用目录 → 名称 → 详细命令）',
-      '1. **查目录 (`catalog`)**：`call_directory({ action: "catalog" })` — 查看下方全部分类总览。',
-      '2. **查名称 (`lookup`)**：`call_directory({ action: "lookup", category: "<分类ID>", query: "<关键词>" })` — 列出对应分类或关键词下的具体工具/技能名称与简介。',
-      '3. **查详细命令并解锁 (`detail`)**：`call_directory({ action: "detail", names: ["<名称1>", "<名称2>"] })` — 获取完整参数定义或技能正文，并**立即挂载到当前会话**（若已知工具名、技能名或分类 ID，也可直接跳到第 3 步一键解锁；传入 `names: ["*"]` 可一键全量展开）。',
+      '## 1. Progressive Three-Step Workflow (Catalog → Lookup → Detail/Unlock)',
+      '1. **Catalog (`catalog`)**: `call_directory({ action: "catalog" })` — Overview all capability categories below.',
+      '2. **Lookup (`lookup`)**: `call_directory({ action: "lookup", category: "<categoryID>", query: "<keyword>" })` — List matching tool/skill names and summaries.',
+      '3. **Detail & Unlock (`detail`)**: `call_directory({ action: "detail", names: ["<name1>", "<name2>"] })` — Inspect full parameter schemas or skill instructions, and **mount immediately into current session** (or pass `names: ["*"]` for full unlock).',
       '',
-      '## 二、可调用能力分类目录',
+      '## 2. Callable Capability Categories Overview',
     ];
 
     const groups = [
-      { key: 'core', header: '### 1. 内置核心工具组 (Core Tools)' },
-      { key: 'skill', header: '### 2. 专业领域技能库 (Skills)' },
-      { key: 'mcp', header: '### 3. MCP 外部服务 (MCP Servers)' },
-      { key: 'plugin', header: '### 4. 特定扩展插件 (Feature Plugins)' },
+      { key: 'core', header: '### 1. Built-in Core Tools (Core Tools)' },
+      { key: 'skill', header: '### 2. Domain Skills Repository (Skills)' },
+      { key: 'mcp', header: '### 3. External MCP Services (MCP Servers)' },
+      { key: 'plugin', header: '### 4. Feature Plugins (Feature Plugins)' },
     ];
 
     for (const grp of groups) {
@@ -810,20 +806,20 @@ export function apply(ctx, config = {}) {
       for (const cat of matchingCats) {
         if (cat.kind === 'skill') {
           const sampleSkills = cat.skills.slice(0, 12).map(s => `\`${s.name}\``).join(', ');
-          const more = cat.skills.length > 12 ? ` 等共 ${cat.skills.length} 个技能` : ` (共 ${cat.skills.length} 个)`;
+          const more = cat.skills.length > 12 ? ` and ${cat.skills.length - 12} more (${cat.skills.length} total)` : ` (${cat.skills.length} total)`;
           lines.push(`- **\`${cat.id}\`** — **${cat.title}**${more}`);
-          lines.push(`  - 简介：${cat.summary}`);
-          lines.push(`  - 常用技能示例：${sampleSkills}`);
+          lines.push(`  - Summary: ${cat.summary}`);
+          lines.push(`  - Example Skills: ${sampleSkills}`);
         } else {
           const uCount = cat.tools.filter(t => t.unlocked).length;
           const statusTag = uCount === cat.tools.length
-            ? `✅ 全部已解锁 (${cat.tools.length}/${cat.tools.length})`
-            : `🔒 已解锁 ${uCount}/${cat.tools.length}`;
+            ? `✅ All Unlocked (${cat.tools.length}/${cat.tools.length})`
+            : `🔒 Unlocked ${uCount}/${cat.tools.length}`;
           const previewNames = cat.tools.slice(0, 8).map(t => `\`${t.name}\``).join(', ');
-          const more = cat.tools.length > 8 ? ` 等` : '';
+          const more = cat.tools.length > 8 ? ` etc.` : '';
           lines.push(`- **\`${cat.id}\`** — **${cat.title}** [${statusTag}]`);
-          lines.push(`  - 简介：${cat.summary}`);
-          lines.push(`  - 包含工具：${previewNames}${more}`);
+          lines.push(`  - Summary: ${cat.summary}`);
+          lines.push(`  - Included Tools: ${previewNames}${more}`);
         }
       }
     }
@@ -872,24 +868,24 @@ export function apply(ctx, config = {}) {
     }
 
     const lines = [
-      `# 调用目录 · 名称检索结果`,
-      `- 检索条件：category=\`${args.category || 'all'}\`, query=\`${args.query || '(无)'}\``,
-      `- 匹配结果：**${matchedTools.length}** 个工具，**${matchedSkills.length}** 个技能`,
+      `# Call Directory · Lookup Results`,
+      `- Search Criteria: category=\`${args.category || 'all'}\`, query=\`${args.query || '(none)'}\``,
+      `- Matches: **${matchedTools.length}** tools, **${matchedSkills.length}** skills`,
     ];
 
     if (matchedTools.length === 0 && matchedSkills.length === 0) {
       lines.push(
         '',
-        '未找到匹配的条目。建议：',
-        '- 调用 `call_directory({ action: "catalog" })` 查看所有可用分类 ID (`core:file`, `core:subagent`, `skills`, `mcp:open-design`, `mcp:rea`, `mcp:tavily`, `mcp:wincu`, `plugin:univer`, `plugin:ssh` 等)。',
-        '- 尝试更简短的关键词搜索。'
+        'No matching items found. Suggestions:',
+        '- Call `call_directory({ action: "catalog" })` to inspect all available category IDs (`core:file`, `core:subagent`, `skills`, `mcp:open-design`, `mcp:rea`, `mcp:tavily`, `mcp:wincu`, `plugin:univer`, `plugin:ssh`, etc.).',
+        '- Try a shorter or more general search query.'
       );
       lines.push('', USAGE_REMINDER_FOOTER);
       return lines.join('\n');
     }
 
     if (matchedTools.length > 0) {
-      lines.push('', '## 匹配的工具 / MCP / 插件命令 (Tools)');
+      lines.push('', '## Matching Tools / MCP / Plugins (Tools)');
       const byCat = new Map();
       for (const t of matchedTools) {
         if (!byCat.has(t.category)) byCat.set(t.category, []);
@@ -899,16 +895,16 @@ export function apply(ctx, config = {}) {
         const catTitle = categories.get(catId)?.title ?? catId;
         lines.push('', `### [${catId}] ${catTitle} (${list.length})`);
         for (const t of list) {
-          const badge = t.unlocked ? '[已解锁]' : '[待解锁]';
-          lines.push(`- \`${t.name}\` ${badge}：${firstLineSummary(t.description, 160)}`);
+          const badge = t.unlocked ? '[Unlocked]' : '[Locked]';
+          lines.push(`- \`${t.name}\` ${badge}: ${firstLineSummary(t.description, 160)}`);
         }
       }
     }
 
     if (matchedSkills.length > 0) {
-      lines.push('', `## 匹配的专业技能 (Skills, 共 ${matchedSkills.length} 个)`);
+      lines.push('', `## Matching Domain Skills (Skills, ${matchedSkills.length} total)`);
       for (const s of matchedSkills) {
-        lines.push(`- \`${s.name}\` [技能]：${firstLineSummary(s.description, 180)}`);
+        lines.push(`- \`${s.name}\` [Skill]: ${firstLineSummary(s.description, 180)}`);
       }
     }
 
@@ -919,9 +915,9 @@ export function apply(ctx, config = {}) {
 
     lines.push(
       '',
-      '## 下一步：获取详细命令并解锁挂载 (`detail`)',
-      `- 请调用 \`call_directory({ action: "detail", names: [${sampleTargets.join(', ') || '"<名称>"'}] })\` 查看完整参数定义（或加载技能全文）并在当前会话中正式解锁。`,
-      `- 也可直接传入分类 ID（如 \`names: ["${matchedTools[0]?.category ?? 'core:file'}"]\`）一键解锁整个分类下的全部工具。`
+      '## Next Step: Inspect Details & Unlock (`detail`)',
+      `- Call \`call_directory({ action: "detail", names: [${sampleTargets.join(', ') || '"<name>"'}] })\` to inspect full parameter schemas (or load skill instructions) and unlock in the current session.`,
+      `- Or pass a category ID (e.g. \`names: ["${matchedTools[0]?.category ?? 'core:file'}"]\`) to unlock all tools in that category at once.`
     );
 
     lines.push('', USAGE_REMINDER_FOOTER);
@@ -1070,35 +1066,35 @@ export function apply(ctx, config = {}) {
     }
 
     const lines = [
-      `# 调用目录 · 详细命令与解锁结果`,
+      `# Call Directory · Mount Results`,
     ];
 
     if (unlockAll) {
       lines.push(
         '',
-        `✅ **已全量解锁当前会话的所有 ${allToolNames.size} 个工具！** 当前会话现已与完整的${isPtcMode ? ' PTC 模式' : '标准模式'}完全一致。`
+        `✅ **All ${allToolNames.size} tools unlocked in current session!** Current session now matches full ${isPtcMode ? 'PTC Mode' : 'Standard Mode'}.`
       );
     } else if (finalTools.size > 0) {
       lines.push(
         '',
-        `✅ **本次已解锁并挂载工具 (${finalTools.size} 个)**：${[...finalTools].map(t => `\`${t}\``).join(', ')}`,
+        `✅ **Successfully unlocked & mounted (${finalTools.size} tools)**: ${[...finalTools].map(t => `\`${t}\``).join(', ')}`,
         isPtcMode
-          ? '> 调用方式（PTC 模式）：在下一步的 `run_code` 中直接通过 `await tools.<name>(args)`（或 `await tools["<name>"](args)`）调用。'
-          : '> 调用方式（标准模式）：这些工具的原生 Schema 现已加入当前会话，从下一步起可直接作为 Function Call 调用。'
+          ? '> Calling syntax (PTC Mode): Call via `await tools.<name>(args)` (or `await tools["<name>"](args)`) in subsequent `run_code` execution.'
+          : '> Calling syntax (Standard Mode): Native schemas are now mounted in the session; call them directly as native function calls in subsequent turns.'
       );
     }
 
     if (unmatched.length > 0) {
       lines.push(
         '',
-        `⚠️ **未找到以下名称**：${unmatched.map(u => `\`${u}\``).join(', ')}。可调用 \`call_directory({ action: "lookup", query: "..." })\` 检索准确名称。`
+        `⚠️ **The following names were not found**: ${unmatched.map(u => `\`${u}\``).join(', ')}. Use \`call_directory({ action: "lookup", query: "..." })\` to look up exact names.`
       );
     }
 
     const detailedList = [...finalTools].map(tName => allToolsMap.get(tName)).filter(Boolean);
     const MAX_FULL_SCHEMAS = 25;
     if (detailedList.length > 0) {
-      lines.push('', `## 详细命令参数定义 (${detailedList.length > MAX_FULL_SCHEMAS ? `显示前 ${MAX_FULL_SCHEMAS} / 共 ${detailedList.length} 个` : `共 ${detailedList.length} 个`})`);
+      lines.push('', `## Command Parameter Schema (${detailedList.length > MAX_FULL_SCHEMAS ? `Showing first ${MAX_FULL_SCHEMAS} / ${detailedList.length} total` : `${detailedList.length} total`})`);
       for (const tool of detailedList.slice(0, MAX_FULL_SCHEMAS)) {
         const callSyntax = isPtcMode
           ? (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(tool.name) ? `await tools.${tool.name}({ ... })` : `await tools[${JSON.stringify(tool.name)}]({ ... })`)
@@ -1106,9 +1102,9 @@ export function apply(ctx, config = {}) {
         lines.push(
           '',
           `### \`${tool.name}\` (${tool.category})`,
-          `- **功能说明**：${tool.description || '(无描述)'}`,
-          `- **调用语法**：\`${callSyntax}\``,
-          `- **参数列表**：`,
+          `- **Description**: ${tool.description || '(no description)'}`,
+          `- **Call Syntax**: \`${callSyntax}\``,
+          `- **Parameters**:`,
           formatParameterSchema(tool.parameters)
         );
       }
@@ -1116,13 +1112,13 @@ export function apply(ctx, config = {}) {
         const restNames = detailedList.slice(MAX_FULL_SCHEMAS).map(t => `\`${t.name}\``).join(', ');
         lines.push(
           '',
-          `> 其余已同步解锁的工具（它们的完整参数定义已自动挂载至会话${isPtcMode ? ' SDK' : '工具栏'}）：${restNames}`
+          `> Remaining unlocked tools (schemas automatically mounted in ${isPtcMode ? 'SDK' : 'session toolbar'}): ${restNames}`
         );
       }
     }
 
     if (loadedSkills.length > 0) {
-      lines.push('', `## 已加载技能完整指令 (${loadedSkills.length} 个)`);
+      lines.push('', `## Loaded Skill Instructions (${loadedSkills.length} skills)`);
       for (const skill of loadedSkills) {
         lines.push('', renderSkillContent(skill));
       }
@@ -1142,7 +1138,7 @@ export function apply(ctx, config = {}) {
   ctx.tools.register({
     name: 'call_directory',
     description:
-      '扩散模式“调用目录”工具：按“调用目录 (catalog) → 名称检索 (lookup) → 详细命令并解锁 (detail)”流程查看和激活本环境中的所有内置工具、专业技能 (Skills)、MCP 服务与扩展插件。',
+      'Diffusion Mode Call Directory: progressively search, inspect, and mount extended tools, domain skills, MCP servers, and feature plugins on demand, with support for dynamic unloading and context pruning.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -1151,22 +1147,23 @@ export function apply(ctx, config = {}) {
           type: 'string',
           enum: ['catalog', 'lookup', 'detail'],
           description:
-            '流程阶段："catalog"（第1步：查看所有可调用能力分类总览与末尾使用说明；无参数时默认执行）、"lookup"（第2步：按 category 或 query 检索具体名称与简介）、"detail"（第3步：传入 names 查看完整参数/技能指令并在当前会话正式解锁挂载）。',
+            'Stage of operation: "catalog" (overview all capability categories & recommended shortcuts; default when no parameters), "lookup" (search specific tools/skills by category or keyword), "detail" (unlock & mount tools/skills; executed automatically when names is provided).',
         },
         category: {
           type: 'string',
           description:
-            '分类 ID，如 "core:file"、"core:subagent"、"core:skill"、"core:task"、"core:web"、"core:dev"、"skills"、"mcp:open-design"、"mcp:rea"、"mcp:tavily"、"mcp:wincu"、"plugin:univer"、"plugin:ssh"、"plugin:ppt-fusion" 或 "all"。',
+            'Category ID or alias (e.g. "core:file" or "fs", "task", "subagent", "skills", "tavily", "rea", etc.).',
         },
         query: {
           type: 'string',
-          description: '搜索关键词（不区分大小写，匹配工具名、技能名、MCP 服务名及描述）。',
+          description:
+            'Search keyword (case-insensitive, matched against tool names, skill names, MCP server names, and descriptions).',
         },
         names: {
           type: 'array',
           items: { type: 'string' },
           description:
-            '要获取详细命令并解锁的具体名称列表（支持工具名如 "read"、"subagent"，技能名如 "docx"、"ppt-master"，分类 ID 如 "core:file"、"mcp:tavily"，前缀通配符如 "univer_*"，或 "*" 全量解锁）。',
+            'Specific name(s) or alias to inspect and unlock (supports tool names like "read", skill names like "docx", category IDs like "core:file", or "*" for full unlock).',
         },
       },
     },
@@ -1200,7 +1197,7 @@ export function apply(ctx, config = {}) {
           : args?.category || args?.query || 'all';
       return {
         card: 'generic',
-        title: `调用目录 (${stage}): ${target}`,
+        title: `Call Directory (${stage}): ${target}`,
         kind: 'search',
         rawInput: JSON.stringify(args ?? {}),
       };
@@ -1257,15 +1254,18 @@ export function apply(ctx, config = {}) {
     interpolate: false,
     text: () =>
       [
-        `# 扩散模式 (${isPtcMode ? 'PTC 版' : '标准版'}) — 渐进式调用目录工作流`,
+        `# Diffusion Mode (${isPtcMode ? 'PTC Edition' : 'Standard Edition'}) · Progressive Workflow`,
         '',
-        '当前会话运行在**扩散模式**。为保持极简的初始上下文，初始仅直接开放极简基础工具（Shell 终端工具与 `read_image`）以及调用目录工具 `call_directory`。',
-        '本环境完整内置了所有标准/PTC模式的能力（文件读写编辑与搜索、子智能体与工作流、Skills 专业技能库、MCP 服务、Univer/SSH/PPT 等扩展插件）。当任务需要使用任何未开放能力时，请遵循 **“调用目录 → 名称 → 详细命令”** 流程：',
-        '1. **查目录 (`catalog`)**：调用 `call_directory({ action: "catalog" })` 查看所有能力分类总览与末尾的重要使用说明。',
-        '2. **查名称 (`lookup`)**：调用 `call_directory({ action: "lookup", category: "<分类ID>", query: "<关键词>" })` 查找目标分类或关键词下的工具/技能名称与描述。',
-        '3. **查详细命令并解锁 (`detail`)**：调用 `call_directory({ action: "detail", names: ["<名称1>", "<名称2>"] })` 获取完整参数定义或技能正文，并将其动态解锁挂载到当前会话中（若已知准确名称或分类 ID 也可直接执行第 3 步一键解锁）。',
+        'The current session runs in **Diffusion Mode**: an ultra-lean initial context (exposing only basic Shell, image reading, and `call_directory`). All extended tools, domain skills, MCP servers, and feature plugins are unlocked on demand and can be pruned/unloaded at any time.',
         '',
-        USAGE_REMINDER_FOOTER,
+        '## Quick Operational Guidelines',
+        '1. **Direct Unlock (One-step)**: Call `call_directory({ names: [...] })` directly (supports array, comma-separated string, or category aliases):',
+        '   - 💻 Standard Coding & Testing: `call_directory({ names: ["core:file", "core:task"] })` (or shorthand `names: ["fs", "task"]`)',
+        '   - 🤖 Task Decomposition & Concurrency: `call_directory({ names: ["core:subagent"] })` (delegate complex/parallel tasks to subagents; do not serialize everything in the main session)',
+        '   - 🌐 Web Search & Fetch: `call_directory({ names: ["mcp:tavily", "core:web"] })`',
+        '   - 🎨 Domain Tasks: Search via `call_directory({ query: "keyword" })` and load the matching `skill`; do not write ad-hoc scripts blindly',
+        '2. **Explore & Search**: Overview categories with `call_directory()`; search tools or skills by category or keyword with `call_directory({ query: "..." })`.',
+        '3. **Dynamic Pruning (Unload)**: When a heavy milestone completes, reclaim context window by calling `call_directory({ action: "unload", names: [...] })` or `{ action: "reset" }`.',
       ].join('\n'),
   });
 

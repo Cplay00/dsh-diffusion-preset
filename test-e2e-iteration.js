@@ -87,17 +87,17 @@ const mockAgent = {
 
 const catalogRes = await registeredTool.execute({}, { agent: mockAgent });
 assert.strictEqual(catalogRes.stage, 'catalog');
-assert(catalogRes.report.includes('⚡ 常用场景一键直达 (Quick Unlocks)'), 'Must include Quick Unlocks section');
-assert(catalogRes.report.includes('核心能力主动使用说明（必读：子智能体与技能）'), 'Must include core reminder header');
-assert(!catalogRes.report.includes('单线程串行堆叠所有操作（既缓慢又污染主上下文）'), 'Footer must be concise');
+assert(catalogRes.report.includes('⚡ Quick Unlocks (Common Scenarios)'), 'Must include Quick Unlocks section');
+assert(catalogRes.report.includes('Active Guidance on Core Capabilities (Must Read: Subagents & Skills)'), 'Must include core reminder header');
+assert(!catalogRes.report.includes('serialize everything in the main session'), 'Footer must be concise');
 console.log('✓ Test 3: Catalog is clear, structured, and concise');
 
 // Test 4: Lookup Output (No repetitive wall of footer)
 const lookupRes = await registeredTool.execute({ query: 'read' }, { agent: mockAgent });
 assert.strictEqual(lookupRes.stage, 'lookup');
 assert(lookupRes.report.includes('read'), 'Must find read tool');
-assert(lookupRes.report.includes('下一步：直接挂载'), 'Must have direct mount prompt');
-assert(!lookupRes.report.includes('核心能力主动使用说明'), 'Lookup MUST NOT append repetitive footer');
+assert(lookupRes.report.includes('Next Step: Mount Directly'), 'Must have direct mount prompt');
+assert(!lookupRes.report.includes('Active Guidance on Core Capabilities'), 'Lookup MUST NOT append repetitive footer');
 console.log('✓ Test 4: Lookup is concise and token-efficient');
 
 // Test 5: Detail Batch Unlock (Compact list, no huge parameters dump)
@@ -105,7 +105,7 @@ const batchDetailRes = await registeredTool.execute({ names: 'fs' }, { agent: mo
 assert.strictEqual(batchDetailRes.stage, 'detail');
 assert(batchDetailRes.unlocked.includes('read'), 'Must unlock read');
 assert(batchDetailRes.unlocked.includes('write'), 'Must unlock write');
-assert(batchDetailRes.report.includes('已解锁工具清单'), 'Batch unlock must show compact summary list');
+assert(batchDetailRes.report.includes('Unlocked Tools List'), 'Batch unlock must show compact summary list');
 assert(!batchDetailRes.report.includes('• `file_path`'), 'Batch unlock must not dump huge parameter schemas');
 
 // Simulate session event
@@ -118,7 +118,7 @@ console.log('✓ Test 5: Batch detail unlock is efficient and lightweight');
 // Test 6: Detail Single Tool Unlock (Detailed parameter schema)
 const singleDetailRes = await registeredTool.execute({ names: ['read'] }, { agent: mockAgent });
 assert.strictEqual(singleDetailRes.stage, 'detail');
-assert(singleDetailRes.report.includes('详细命令参数定义'), 'Single tool unlock should include parameter schema');
+assert(singleDetailRes.report.includes('Command Parameter Schema'), 'Single tool unlock should include parameter schema');
 assert(singleDetailRes.report.includes('file_path'), 'Single tool schema must list file_path');
 console.log('✓ Test 6: Single tool detail provides full schema on request');
 
@@ -142,7 +142,7 @@ console.log('✓ Test 7: Dynamic tool unload and session reset passed');
 
 // Test 8: System Prompt Guide Inspection
 const promptGuide = registeredPrompt.text();
-assert(promptGuide.includes('渐进式扩展工作流'), 'Prompt guide should be titled cleanly');
+assert(promptGuide.includes('Progressive Workflow'), 'Prompt guide should be titled cleanly');
 assert(promptGuide.includes('call_directory({ names: ["core:file", "core:task"] })'), 'Prompt guide should give quick unlocks');
 const guideLines = promptGuide.split('\n').filter(l => l.trim().length > 0);
 assert(guideLines.length <= 25, `Guide should be concise (currently ${guideLines.length} lines)`);

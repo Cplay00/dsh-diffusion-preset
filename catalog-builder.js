@@ -30,13 +30,13 @@ export const COMPANION_GROUPS = [
 /** Static metadata for core categories and known plugin/MCP families. */
 export const CATEGORY_META = {
   'core:file': {
-    title: '文件读写与代码搜索 (Core File & Search)',
-    summary: '读取、创建、精确编辑文本文件，按路径通配符 (glob) 或正则内容 (grep) 搜索代码，以及切换工作目录。',
+    title: 'File Operations & Code Search (Core File & Search)',
+    summary: 'Read, create, edit files precisely, search code with glob patterns or ripgrep regex, and change working directory.',
     tools: new Set(['read', 'write', 'edit', 'glob', 'grep', 'working_directory', 'ops_read_files', 'ops_discover_tools']),
   },
   'core:subagent': {
-    title: '子智能体委派、工作流与团队协作 (Subagent, Workflow & Team)',
-    summary: '派发独立或继承上下文的子智能体 (subagent / subagent_fork)、运行并发编排脚本 (workflow)、Ralph 迭代循环及多智能体团队协作。',
+    title: 'Subagent Delegation, Workflows & Teammates (Subagent, Workflow & Team)',
+    summary: 'Spawn fresh or forked subagents (subagent / subagent_fork), execute concurrent orchestration scripts (workflow), run Ralph iteration loops, and collaborate in agent teams.',
     tools: new Set([
       'subagent', 'subagent_fork', 'send_message', 'interrupt_agent', 'list_agents',
       'workflow', 'ralph',
@@ -44,13 +44,13 @@ export const CATEGORY_META = {
     ]),
   },
   'core:skill': {
-    title: '技能加载器与工作区依赖 (Skill Loader & Runtime Dependencies)',
-    summary: '加载专业领域技能完整指令 (skill)，以及获取内置 Python/Node/pnpm 与 Office 依赖路径 (load_workspace_dependencies)。',
+    title: 'Skill Loader & Runtime Dependencies (Skill Loader & Runtime Dependencies)',
+    summary: 'Load domain skill instructions (skill), and resolve built-in Python/Node/pnpm and Office runtime paths (load_workspace_dependencies).',
     tools: new Set(['skill', 'load_workspace_dependencies']),
   },
   'core:task': {
-    title: '任务规划、长程目标、澄清提问与后台作业 (Task, Goal, Question, Jobs & Schedule)',
-    summary: '管理多步任务清单 (todo_write)、向用户提问确认 (ask_user_question)、提交规划审批 (exit_plan_mode)、长程目标 (goal) 与后台任务/定时提醒。',
+    title: 'Task Planning, Long-running Goals, Clarification & Background Jobs (Task, Goal, Question, Jobs & Schedule)',
+    summary: 'Manage multi-step task list (todo_write), ask user questions for clarification (ask_user_question), submit plan review (exit_plan_mode), track long-running goals (goal), and manage background jobs/schedules.',
     tools: new Set([
       'todo_write', 'ask_user_question', 'exit_plan_mode',
       'create_goal', 'get_goal', 'update_goal',
@@ -59,13 +59,13 @@ export const CATEGORY_META = {
     ]),
   },
   'core:web': {
-    title: '联网搜索、网页抓取与成果交付 (Web Search/Fetch & Present)',
-    summary: '执行实时联网搜索 (web_search)、抓取指定 URL 网页内容 (web_fetch)，以及向用户展示最终交付文件卡片 (present)。',
+    title: 'Web Search, Fetch & Artifact Presentation (Web Search/Fetch & Present)',
+    summary: 'Perform live web searches (web_search), fetch web pages by URL (web_fetch), and present finished deliverable cards (present).',
     tools: new Set(['web_search', 'web_fetch', 'present']),
   },
   'core:dev': {
-    title: '持久终端、历史会话检索、Worktree 与插件管理 (Terminal, Session, Worktree & Cordis)',
-    summary: '操作持久化交互终端 (terminal_*)、检索历史会话事件 (session_*)、创建 Git Worktree，以及自省/管理 Cordis 插件与预设。',
+    title: 'Persistent Terminals, Session Search, Worktrees & Cordis (Terminal, Session, Worktree & Cordis)',
+    summary: 'Interact with persistent terminal shells (terminal_*), search historical session events (session_*), create Git worktrees, and inspect/manage Cordis plugins and presets.',
     tools: new Set([
       'terminal_open', 'terminal_send', 'terminal_read', 'terminal_signal', 'terminal_close', 'terminal_list',
       'session_search', 'session_trace', 'session_event_search', 'session_event_read', 'session_event_trace',
@@ -126,46 +126,46 @@ export function normalizeTokenList(raw) {
 }
 
 export const KNOWN_MCP_DESCRIPTIONS = {
-  'open-design': 'OpenDesign 本地与云端设计工作台：网页 UI/UX、交互原型、幻灯片演示、设计系统生成与制品读写。',
-  'rea': 'Reverse Engineer Anything (REA) 逆向工程：二进制 (ELF/PE/Mach-O/APK/WASM/固件)、JS 包与浏览器运行时的静态/动态分析。',
-  'tavily': 'Tavily AI 联网检索：面向 LLM 优化的实时网页搜索 (search)、正文提取 (extract)、全站爬取 (crawl/map) 与深度调研 (research)。',
-  'wincu': 'Windows Computer Use & 浏览器自动化：优先通过浏览器通道操作网页标签页，或通过桌面 UIA/截图/OCR 控制本地 Windows 应用。',
-  'openviking': 'OpenViking 跨会话持久记忆与技能存储服务。',
+  'open-design': 'OpenDesign workspace: Web UI/UX, interactive prototypes, slide presentations, design system generation, and artifact read/write.',
+  'rea': 'Reverse Engineer Anything (REA): Binary (ELF/PE/Mach-O/APK/WASM/firmware), JS bundles, and browser runtime static/dynamic analysis.',
+  'tavily': 'Tavily AI Search: LLM-optimized real-time web search, content extraction, full-site crawl/map, and deep research.',
+  'wincu': 'Windows Computer Use & Browser Automation: Control browser tabs, or automate Windows desktop apps via UIA, screenshots, and OCR.',
+  'openviking': 'OpenViking cross-session persistent memory and skill storage service.',
 };
 
 export const KNOWN_PLUGIN_FAMILIES = [
   {
     id: 'plugin:univer',
     prefix: 'univer_',
-    title: 'Univer 办公文档与画板套件 (dsh-univer-office)',
-    summary: '创建、检查、导入导出、编译 SVG 幻灯片、渲染截图、打印 PDF 及通过 Facade API 操作 .univer 表格/文档/幻灯片/多维表/画板。',
+    title: 'Univer Office & Canvas Suite (dsh-univer-office)',
+    summary: 'Create, inspect, import/export, compile SVG slides, render screenshots, export PDF, and automate .univer sheets/docs/slides/canvas via Facade API.',
   },
   {
     id: 'plugin:ssh',
     prefix: 'ssh_',
-    title: 'SSH 远程主机与集群管理 (@linxin666/dsh-ssh)',
-    summary: '列出已配置 SSH 主机、远程执行命令 (ssh_exec)、集群并发执行 (ssh_cluster)、上传下载文件与管理本地端口转发隧道。',
+    title: 'SSH Remote Host & Cluster Manager (@linxin666/dsh-ssh)',
+    summary: 'List configured SSH hosts, execute remote commands (ssh_exec), run cluster-wide commands (ssh_cluster), transfer files, and manage port-forwarding tunnels.',
   },
   {
     id: 'plugin:ppt-fusion',
     prefix: 'dsh_ppt_',
-    title: 'DSH 融合 PPT 预览与评审 (dsh-ppt-flashmade)',
-    summary: '在对话内直接预览融合 PPT 幻灯片 (dsh_ppt_preview)、生成草稿提案卡片 (dsh_ppt_propose) 及挂载渲染图进行视觉自检 (dsh_ppt_review)。',
+    title: 'DSH PPT Fusion Preview & Review (dsh-ppt-flashmade)',
+    summary: 'Preview PPT slides inside conversation (dsh_ppt_preview), generate draft proposals (dsh_ppt_propose), and mount rendered slides for visual review (dsh_ppt_review).',
   },
   {
     id: 'plugin:sidebar',
     exact: new Set(['sidebar_open']),
-    title: '右侧边栏联动插件 (dsh-better-sidebar)',
-    summary: '在当前会话右侧边栏编辑器、文件树或内置浏览器中直接打开本地文件、目录或 HTTP(S) 网页 (sidebar_open)。',
+    title: 'Right Sidebar Integration (dsh-better-sidebar)',
+    summary: 'Open local files, directories, or HTTP(S) web pages directly inside the right sidebar editor, file tree, or embedded browser (sidebar_open).',
   },
 ];
 
 /** Concise footer reminder placed at the end of directory outputs (focused on Subagent & Skill). */
 export const USAGE_REMINDER_FOOTER = [
   '---',
-  '### 💡 核心能力主动使用说明（必读：子智能体与技能）',
-  '1. **子智能体 (`subagent`)**：多文件/跨模块调研与可并行任务，请直接解锁 `subagent` 委派处理，切勿在主会话单线程串行堆叠。',
-  '2. **专业技能 (`skills`)**：垂直领域任务（Office、设计、逆向、自动化测试等）请优先加载对应 `skill`，切勿盲目手写脚本。',
+  '### 💡 Active Guidance on Core Capabilities (Must Read: Subagents & Skills)',
+  '1. **Subagents (`subagent`)**: For multi-file/cross-module exploration or parallelizable tasks, unlock `subagent` immediately to delegate; avoid serializing everything in the main session.',
+  '2. **Domain Skills (`skills`)**: For specialized domain tasks (Office documents, UI design, reverse engineering, browser automation, etc.), always load the corresponding `skill` first instead of writing ad-hoc scripts.',
 ].join('\n');
 
 export function firstLineSummary(text, maxLen = 140) {
@@ -338,8 +338,8 @@ export async function buildCompleteInventory(ctx, targetScope, signal) {
   categories.set('skills', {
     id: 'skills',
     kind: 'skill',
-    title: '专业领域技能库 (Skills)',
-    summary: '按需加载特定领域的完整工作流、脚本规范与最佳实践指令（涵盖 Office/Univer/设计/浏览器控制/逆向/搜索调研/插件开发/飞牛OS/记忆等）。',
+    title: 'Domain Skills Repository (Skills)',
+    summary: 'Load complete domain workflows, coding standards, and best-practice instructions on demand (covering Office, Univer, Design, Browser Automation, Reverse Engineering, Research, Plugin Dev, fnOS, Memory, etc.).',
     tools: [],
     skills: [...skills],
   });
@@ -351,8 +351,8 @@ export async function buildCompleteInventory(ctx, targetScope, signal) {
         categories.set('mcp:resources', {
           id: 'mcp:resources',
           kind: 'mcp',
-          title: 'MCP 资源读取工具 (MCP Resources)',
-          summary: '列出并读取各 MCP 服务端提供的 URI 资源与参数化资源模板。',
+          title: 'MCP Resource Tools (MCP Resources)',
+          summary: 'List and read URI resources and parameterized resource templates provided by MCP servers.',
           tools: [],
           skills: [],
         });
@@ -361,8 +361,8 @@ export async function buildCompleteInventory(ctx, targetScope, signal) {
         categories.set(tool.category, {
           id: tool.category,
           kind: 'mcp',
-          title: `MCP 服务: ${server}`,
-          summary: KNOWN_MCP_DESCRIPTIONS[server] ?? `来自 MCP 服务端 "${server}" 的工具集合。`,
+          title: `MCP Server: ${server}`,
+          summary: KNOWN_MCP_DESCRIPTIONS[server] ?? `Tool collection from MCP server "${server}".`,
           tools: [],
           skills: [],
         });
@@ -371,8 +371,8 @@ export async function buildCompleteInventory(ctx, targetScope, signal) {
         categories.set(tool.category, {
           id: tool.category,
           kind: 'plugin',
-          title: family?.title ?? `扩展插件工具 (${tool.category})`,
-          summary: family?.summary ?? '当前 Profile 安装的扩展插件工具。',
+          title: family?.title ?? `Feature Plugin Tools (${tool.category})`,
+          summary: family?.summary ?? 'Extended plugin tools installed in the current profile.',
           tools: [],
           skills: [],
         });
@@ -392,40 +392,40 @@ export async function buildCompleteInventory(ctx, targetScope, signal) {
 
 /** Render a full markdown document describing all available callable capabilities in the harness. */
 export function renderCatalogMarkdown(inventory, options = {}) {
-  const { isPtcMode = false, title = '扩散模式 · 调用目录' } = options;
+  const { isPtcMode = false, title = 'Diffusion Mode · Call Directory' } = options;
   const { allToolsMap, skills, categories } = inventory;
   const initialList = [...INITIAL_TOOLS].filter(t => t !== 'structured_output' && t !== 'run_code');
   const totalTools = [...allToolsMap.values()].filter(t => t.category !== 'initial').length;
 
   const lines = [
-    `# ${title} (${isPtcMode ? 'PTC 代码模式' : '标准函数调用模式'})`,
+    `# ${title} (${isPtcMode ? 'PTC Code Mode' : 'Standard Function Calling Mode'})`,
     '',
-    `> **最后同步时间**：${new Date().toLocaleString('zh-CN', { hour12: false })}  `,
-    `> **状态说明**：本文件由 DSH 宿主实时监听自动维护。每当 Harness 内部发生工具、技能、MCP 或插件的安装、变动或卸载时，本文件将以毫秒级延迟自动重绘刷新。`,
+    `> **Last Synchronized**: ${new Date().toISOString()}  `,
+    `> **Status**: Maintained in real time by the DSH host. Automatically regenerated whenever tools, skills, MCP servers, or plugins are added, modified, or removed.`,
     '',
-    `- **默认已开放极简工具**：${initialList.map(t => `\`${t}\``).join(', ')}`,
-    `- **环境内置可扩展总能力**：共 **${totalTools}** 个扩展工具 + **${skills.length}** 个专业技能 (Skills)`,
+    `- **Default Basic Tools**: ${initialList.map(t => `\`${t}\``).join(', ')}`,
+    `- **Total Capabilities in Environment**: **${totalTools}** extended tools + **${skills.length}** domain skills (Skills)`,
     '',
-    '## ⚡ 常用场景一键直达 (Quick Unlocks)',
-    '- 💻 **常规编码与测试**：`call_directory({ names: ["core:file", "core:task"] })`（或简写 `names: ["fs", "task"]`）',
-    '- 🤖 **多任务并行/子智能体**：`call_directory({ names: ["core:subagent"] })`',
-    '- 🌐 **实时联网与网页检索**：`call_directory({ names: ["mcp:tavily", "core:web"] })`',
-    '- 🎨 **办公文档与画板套件**：`call_directory({ names: ["skills", "plugin:univer"] })`',
+    '## ⚡ Quick Unlocks (Common Scenarios)',
+    '- 💻 **Standard Coding & Testing**: `call_directory({ names: ["core:file", "core:task"] })` (or shorthand `names: ["fs", "task"]`)',
+    '- 🤖 **Multi-task Concurrency / Subagents**: `call_directory({ names: ["core:subagent"] })`',
+    '- 🌐 **Real-time Web Search & Fetch**: `call_directory({ names: ["mcp:tavily", "core:web"] })`',
+    '- 🎨 **Office Documents & Canvas Suite**: `call_directory({ names: ["skills", "plugin:univer"] })`',
     '',
-    '## 一、渐进调用流程（调用目录 → 检索 → 挂载/卸载）',
-    '1. **查目录 (`catalog`)**：`call_directory()` — 随时查看能力分类总览与最新使用规范。',
-    '2. **查名称 (`lookup`)**：`call_directory({ query: "<关键词>" })` — 精确检索对应分类或关键词下的工具/技能名称。',
-    '3. **挂载解锁 (`detail`)**：`call_directory({ names: ["<名称或分类>"] })` — 立即解锁挂载（支持别名与通配符 `*`）。',
-    '4. **动态卸载 (`unload`)**：`call_directory({ action: "unload", names: ["<名称或分类>"] })` — 缩减上下文以保持轻盈。',
+    '## 1. Progressive Disclosure Flow (Catalog → Lookup → Detail/Unlock → Unload)',
+    '1. **Catalog (`catalog`)**: `call_directory()` — Overview capability categories and guidelines.',
+    '2. **Lookup (`lookup`)**: `call_directory({ query: "<keyword>" })` — Search tool or skill names by category or keyword.',
+    '3. **Detail & Unlock (`detail`)**: `call_directory({ names: ["<name or category>"] })` — Unlock and mount tools/skills immediately (supports aliases and wildcard `*`).',
+    '4. **Dynamic Unload (`unload`)**: `call_directory({ action: "unload", names: ["<name or category>"] })` — Prune tools from context to keep it lightweight.',
     '',
-    '## 二、可调用能力分类总览',
+    '## 2. Callable Capability Categories Overview',
   ];
 
   const groups = [
-    { key: 'core', header: '### 1. 内置核心工具组 (Core Tools)' },
-    { key: 'skill', header: '### 2. 专业领域技能库 (Skills)' },
-    { key: 'mcp', header: '### 3. MCP 外部服务 (MCP Servers)' },
-    { key: 'plugin', header: '### 4. 特定扩展插件 (Feature Plugins)' },
+    { key: 'core', header: '### 1. Built-in Core Tools (Core Tools)' },
+    { key: 'skill', header: '### 2. Domain Skills Repository (Skills)' },
+    { key: 'mcp', header: '### 3. External MCP Services (MCP Servers)' },
+    { key: 'plugin', header: '### 4. Feature Plugins (Feature Plugins)' },
   ];
 
   for (const grp of groups) {
@@ -434,18 +434,18 @@ export function renderCatalogMarkdown(inventory, options = {}) {
     lines.push('', grp.header);
     for (const cat of matchingCats) {
       if (cat.kind === 'skill') {
-        lines.push(`- **\`${cat.id}\`** — **${cat.title}** (共 **${cat.skills.length}** 个技能)`);
-        lines.push(`  - 简介：${cat.summary}`);
-        lines.push('  - 技能列表：');
+        lines.push(`- **\`${cat.id}\`** — **${cat.title}** (${cat.skills.length} skills total)`);
+        lines.push(`  - Summary: ${cat.summary}`);
+        lines.push('  - Skill List:');
         for (const s of cat.skills) {
-          lines.push(`    - \`${s.name}\`：${firstLineSummary(s.description, 120)}`);
+          lines.push(`    - \`${s.name}\`: ${firstLineSummary(s.description, 120)}`);
         }
       } else {
-        lines.push(`- **\`${cat.id}\`** — **${cat.title}** (共 **${cat.tools.length}** 个工具)`);
-        lines.push(`  - 简介：${cat.summary}`);
-        lines.push('  - 工具列表：');
+        lines.push(`- **\`${cat.id}\`** — **${cat.title}** (${cat.tools.length} tools total)`);
+        lines.push(`  - Summary: ${cat.summary}`);
+        lines.push('  - Tool List:');
         for (const t of cat.tools) {
-          lines.push(`    - \`${t.name}\`：${firstLineSummary(t.description, 120)}`);
+          lines.push(`    - \`${t.name}\`: ${firstLineSummary(t.description, 120)}`);
         }
       }
     }
