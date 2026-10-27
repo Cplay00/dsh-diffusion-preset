@@ -126,37 +126,40 @@ export function normalizeTokenList(raw) {
 }
 
 export const KNOWN_MCP_DESCRIPTIONS = {
-  'open-design': 'OpenDesign workspace: Web UI/UX, interactive prototypes, slide presentations, design system generation, and artifact read/write.',
-  'rea': 'Reverse Engineer Anything (REA): Binary (ELF/PE/Mach-O/APK/WASM/firmware), JS bundles, and browser runtime static/dynamic analysis.',
-  'tavily': 'Tavily AI Search: LLM-optimized real-time web search, content extraction, full-site crawl/map, and deep research.',
-  'wincu': 'Windows Computer Use & Browser Automation: Control browser tabs, or automate Windows desktop apps via UIA, screenshots, and OCR.',
-  'openviking': 'OpenViking cross-session persistent memory and skill storage service.',
+  'filesystem': 'Local and workspace filesystem read, write, and directory inspection operations.',
+  'github': 'GitHub repositories, pull requests, issues, and code search integration.',
+  'fetch': 'Universal HTTP and web content fetching, parsing, and data extraction.',
+  'memory': 'Persistent graph-based and semantic memory across agent sessions.',
+  'search': 'Web search, content retrieval, and online information queries.',
+  'tavily': 'AI-optimized real-time web search, content extraction, and deep research.',
+  'rea': 'Reverse engineering, binary analysis, and disassembly tools.',
+  'open-design': 'Design workspace for UI/UX, interactive prototypes, and design systems.',
 };
 
 export const KNOWN_PLUGIN_FAMILIES = [
   {
     id: 'plugin:univer',
     prefix: 'univer_',
-    title: 'Univer Office & Canvas Suite (dsh-univer-office)',
-    summary: 'Create, inspect, import/export, compile SVG slides, render screenshots, export PDF, and automate .univer sheets/docs/slides/canvas via Facade API.',
+    title: 'Univer Office & Canvas Suite (Univer)',
+    summary: 'Automate spreadsheets, documents, presentations, and visual canvases via Univer APIs.',
   },
   {
     id: 'plugin:ssh',
     prefix: 'ssh_',
-    title: 'SSH Remote Host & Cluster Manager (@linxin666/dsh-ssh)',
-    summary: 'List configured SSH hosts, execute remote commands (ssh_exec), run cluster-wide commands (ssh_cluster), transfer files, and manage port-forwarding tunnels.',
+    title: 'SSH Remote Host & Cluster Manager (SSH)',
+    summary: 'Manage remote SSH hosts, execute remote commands, cluster operations, file transfers, and port forwarding.',
   },
   {
     id: 'plugin:ppt-fusion',
     prefix: 'dsh_ppt_',
-    title: 'DSH PPT Fusion Preview & Review (dsh-ppt-flashmade)',
-    summary: 'Preview PPT slides inside conversation (dsh_ppt_preview), generate draft proposals (dsh_ppt_propose), and mount rendered slides for visual review (dsh_ppt_review).',
+    title: 'Presentation Preview & Review Suite (PPT)',
+    summary: 'Interactive slide presentation preview, draft proposals, and visual review rendering.',
   },
   {
     id: 'plugin:sidebar',
     exact: new Set(['sidebar_open']),
-    title: 'Right Sidebar Integration (dsh-better-sidebar)',
-    summary: 'Open local files, directories, or HTTP(S) web pages directly inside the right sidebar editor, file tree, or embedded browser (sidebar_open).',
+    title: 'Workspace Sidebar Navigation (Sidebar)',
+    summary: 'Open local files, directories, and web pages inside the workspace sidebar.',
   },
 ];
 
@@ -408,9 +411,10 @@ export function renderCatalogMarkdown(inventory, options = {}) {
     '',
     '## ⚡ Quick Unlocks (Common Scenarios)',
     '- 💻 **Standard Coding & Testing**: `call_directory({ names: ["core:file", "core:task"] })` (or shorthand `names: ["fs", "task"]`)',
-    '- 🤖 **Multi-task Concurrency / Subagents**: `call_directory({ names: ["core:subagent"] })`',
-    '- 🌐 **Real-time Web Search & Fetch**: `call_directory({ names: ["mcp:tavily", "core:web"] })`',
-    '- 🎨 **Office Documents & Canvas Suite**: `call_directory({ names: ["skills", "plugin:univer"] })`',
+    '- 🤖 **Subagents & Concurrent Workflows**: `call_directory({ names: ["core:subagent"] })` (or shorthand `names: ["subagent"]`)',
+    '- 🌐 **Web Access & Presentation**: `call_directory({ names: ["core:web"] })` (or shorthand `names: ["web"]`)',
+    '- 🎨 **Domain Skills Repository**: `call_directory({ names: ["skills"] })`',
+    '- 🚀 **Full Standard Mode Unlock**: `call_directory({ names: ["*"] })`',
     '',
     '## 1. Progressive Disclosure Flow (Catalog → Lookup → Detail/Unlock → Unload)',
     '1. **Catalog (`catalog`)**: `call_directory()` — Overview capability categories and guidelines.',

@@ -1,44 +1,69 @@
-# Diffusion Mode · Call Directory (Standard Mode)
+# Diffusion Mode · Capability Catalog & Architecture Guide
 
-- **Currently Available Basic Tools**: `call_directory`, `pwsh`, `read_image`
-- **Total Capabilities in Environment**: **15** extended tools (**0** unlocked) + **2** domain skills (Skills)
-
-## ⚡ Quick Unlocks (Common Scenarios)
-- 💻 **Standard Coding & Testing**: `call_directory({ names: ["core:file", "core:task"] })` (or shorthand `names: ["fs", "task"]`)
-- 🤖 **Multi-task Concurrency / Subagents**: `call_directory({ names: ["core:subagent"] })`
-- 🌐 **Real-time Web Search & Fetch**: `call_directory({ names: ["mcp:tavily", "core:web"] })`
-- 🎨 **Office Documents & Canvas Suite**: `call_directory({ names: ["skills", "plugin:univer"] })`
-
-## 1. Progressive Disclosure Flow (Catalog → Lookup → Detail/Unlock → Unload)
-1. **Catalog (`catalog`)**: `call_directory()` — Overview all capability categories and recommended shortcuts.
-2. **Lookup (`lookup`)**: `call_directory({ query: "<keyword>" })` — Search specific tool/skill names by category or keyword.
-3. **Detail & Unlock (`detail`)**: `call_directory({ names: ["<name or category>"] })` — Unlock and mount tools/skills immediately (supports aliases and wildcard `*`).
-4. **Dynamic Unload (`unload`)**: `call_directory({ action: "unload", names: ["<name or category>"] })` — Prune tools from context to keep it lightweight.
-
-## 2. Callable Capability Categories Overview
-
-### 1. Built-in Core Tools (Core Tools)
-- **`core:file`** — **File Operations & Code Search (Core File & Search)** [🔒 Unlocked 0/8]
-  - Summary: Read, create, edit files precisely, search code with glob patterns or ripgrep regex, and change working directory.
-  - Included Tools: `read`, `write`, `edit`, `glob`, `grep`, `working_directory`, `ops_read_files`, `ops_discover_tools`
-- **`core:subagent`** — **Subagent Delegation, Workflows & Teammates (Subagent, Workflow & Team)** [🔒 Unlocked 0/5]
-  - Summary: Spawn fresh or forked subagents (subagent / subagent_fork), execute concurrent orchestration scripts (workflow), run Ralph iteration loops, and collaborate in agent teams.
-  - Included Tools: `subagent`, `subagent_fork`, `send_message`, `interrupt_agent`, `list_agents`
-- **`core:task`** — **Task Planning, Long-running Goals, Clarification & Background Jobs (Task, Goal, Question, Jobs & Schedule)** [🔒 Unlocked 0/1]
-  - Summary: Manage multi-step task list (todo_write), ask user questions for clarification (ask_user_question), submit plan review (exit_plan_mode), track long-running goals (goal), and manage background jobs/schedules.
-  - Included Tools: `todo_write`
-
-### 2. Domain Skills Repository (Skills)
-- **`skills`** — **Domain Skills Repository (Skills)** (2 total)
-  - Summary: Load complete domain workflows, coding standards, and best-practice instructions on demand (covering Office, Univer, Design, Browser Automation, Reverse Engineering, Research, Plugin Dev, fnOS, Memory, etc.).
-  - Example Skills: `docx`, `ppt-master`
-
-### 3. External MCP Services (MCP Servers)
-- **`mcp:rea`** — **MCP Server: rea** [🔒 Unlocked 0/1]
-  - Summary: Reverse Engineer Anything (REA): Binary (ELF/PE/Mach-O/APK/WASM/firmware), JS bundles, and browser runtime static/dynamic analysis.
-  - Included Tools: `mcp__rea__disasm`
+Diffusion Mode provides a progressive disclosure runtime for DeepSeek Harness (DSH). Instead of bloating the initial model context with hundreds of tool schemas and extensive instructions, Diffusion Mode boots in an ultra-lean initial surface and expands tools, skills, MCP servers, and feature plugins on demand.
 
 ---
-### 💡 Active Guidance on Core Capabilities (Must Read: Subagents & Skills)
-1. **Subagents (`subagent`)**: For multi-file/cross-module exploration or parallelizable tasks, unlock `subagent` immediately to delegate; avoid serializing everything in the main session.
-2. **Domain Skills (`skills`)**: For specialized domain tasks (Office documents, UI design, reverse engineering, browser automation, etc.), always load the corresponding `skill` first instead of writing ad-hoc scripts.
+
+## ⚡ Quick Unlock Macros
+
+Common scenarios can be unlocked in a single step using category shorthands or direct names:
+
+- 💻 **Standard Coding & Testing**: `call_directory({ names: ["core:file", "core:task"] })` (or shorthand `names: ["fs", "task"]`)
+- 🤖 **Subagents & Concurrent Workflows**: `call_directory({ names: ["core:subagent"] })` (or shorthand `names: ["subagent"]`)
+- 🌐 **Web Access & Presentation**: `call_directory({ names: ["core:web"] })` (or shorthand `names: ["web"]`)
+- 🎨 **Domain Skills Repository**: `call_directory({ names: ["skills"] })`
+- 🚀 **Full Standard Mode Unlock**: `call_directory({ names: ["*"] })`
+
+---
+
+## 🔄 Progressive Disclosure Lifecycle
+
+The progressive expansion lifecycle consists of four lightweight phases:
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│ 1. Catalog  │ ──> │  2. Lookup  │ ──> │ 3. Detail & Unlock  │ ──> │  4. Dynamic Unload  │
+│  (Overview) │     │  (Search)   │     │ (Mount into Session)│     │  (Prune / Reset)    │
+└─────────────┘     └─────────────┘     └─────────────────────┘     └─────────────────────┘
+```
+
+1. **Catalog (`catalog`)**: `call_directory()`  
+   Returns the top-level categorization of all callable capabilities available in the current DSH environment.
+2. **Lookup (`lookup`)**: `call_directory({ category: "<categoryID>", query: "<keyword>" })`  
+   Searches specific tools or skills by category ID or keyword without dumping large parameter schemas into the context.
+3. **Detail & Unlock (`detail`)**: `call_directory({ names: ["<name1>", "<name2>"] })`  
+   Inspects full parameter schemas and automatically mounts the requested tools or skills into the active session.
+4. **Dynamic Unload (`unload` / `reset`)**:  
+   - `call_directory({ action: "unload", names: ["<name or category>"] })`: Selectively unloads heavyweight tools to shrink context.
+   - `call_directory({ action: "reset" })`: Resets the session back to the minimal initial state (Shell + `read_image` + `call_directory`).
+
+---
+
+## 📦 Core Capability Categories
+
+| Category ID | Shorthand | Name | Description |
+| :--- | :--- | :--- | :--- |
+| `core:file` | `fs`, `file` | File Operations & Code Search | File reading, writing, precise editing, glob pattern search, and ripgrep code search. |
+| `core:subagent` | `subagent`, `workflow` | Subagents & Team Delegation | Spawning fresh/forked subagents, running concurrent orchestration workflows, and multi-agent teams. |
+| `core:skill` | `skill` | Skill Loader & Dependencies | Domain skill loading and resolving workspace runtime dependencies. |
+| `core:task` | `task`, `todo` | Task Planning & Background Jobs | Multi-step task tracking, user questions, long-running goals, and background jobs. |
+| `core:web` | `web`, `search` | Web Search & Presentation | Live web searches, web page content extraction, and finished artifact presentation cards. |
+| `core:dev` | `dev`, `terminal` | Developer Tools & Session Trace | Persistent interactive terminals, session history search, and Git worktree management. |
+| `skills` | `skills` | Domain Skills Repository | Complete domain workflows, coding standards, and best practices (Office, design, analysis, etc.). |
+
+---
+
+## 🔌 Universal Extensibility (MCP & Plugins)
+
+Diffusion Mode dynamically discovers and organizes any external capabilities installed in the DSH profile:
+
+- **MCP Servers (`mcp:<server_name>`)**: Any tool registered with the prefix `mcp__<server>__` is automatically grouped under its corresponding MCP service, with server-specific system prompt sections gated until unlocked.
+- **Feature Plugins (`plugin:<plugin_name>`)**: Extended plugins installed via the DSH marketplace or profile are dynamically grouped by prefix and mountable on demand.
+
+---
+
+## 💡 Prompt Engineering & Context Economy
+
+1. **Subagent Delegation (`subagent`)**: For multi-file investigation, deep code reviews, or parallel subtasks, unlock `subagent` to delegate work rather than serializing all operations in the main session.
+2. **Domain Skills (`skills`)**: For specialized domain tasks (Office documents, UI design, security analysis, automation), always check and load the corresponding `skill` first to follow proven workflows.
+3. **Context Pruning**: When completing large milestones, call `call_directory({ action: "unload", names: [...] })` to keep the context window lean and focused.

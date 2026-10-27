@@ -6,3 +6,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .history/
+
+# Host runtime snapshots and verification dumps
+catalog-snapshot.json
+preset-status.json
+*.snapshot.json
+扩散模式调用目录.md
+Diffusion Mode Call Directory.md

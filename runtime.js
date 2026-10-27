@@ -84,37 +84,40 @@ const CATEGORY_META = {
 };
 
 const KNOWN_MCP_DESCRIPTIONS = {
-  'open-design': 'OpenDesign workspace: Web UI/UX, interactive prototypes, slide presentations, design system generation, and artifact read/write.',
-  'rea': 'Reverse Engineer Anything (REA): Binary (ELF/PE/Mach-O/APK/WASM/firmware), JS bundles, and browser runtime static/dynamic analysis.',
-  'tavily': 'Tavily AI Search: LLM-optimized real-time web search, content extraction, full-site crawl/map, and deep research.',
-  'wincu': 'Windows Computer Use & Browser Automation: Control browser tabs, or automate Windows desktop apps via UIA, screenshots, and OCR.',
-  'openviking': 'OpenViking cross-session persistent memory and skill storage service.',
+  'filesystem': 'Local and workspace filesystem read, write, and directory inspection operations.',
+  'github': 'GitHub repositories, pull requests, issues, and code search integration.',
+  'fetch': 'Universal HTTP and web content fetching, parsing, and data extraction.',
+  'memory': 'Persistent graph-based and semantic memory across agent sessions.',
+  'search': 'Web search, content retrieval, and online information queries.',
+  'tavily': 'AI-optimized real-time web search, content extraction, and deep research.',
+  'rea': 'Reverse engineering, binary analysis, and disassembly tools.',
+  'open-design': 'Design workspace for UI/UX, interactive prototypes, and design systems.',
 };
 
 const KNOWN_PLUGIN_FAMILIES = [
   {
     id: 'plugin:univer',
     prefix: 'univer_',
-    title: 'Univer Office & Canvas Suite (dsh-univer-office)',
-    summary: 'Create, inspect, import/export, compile SVG slides, render screenshots, export PDF, and automate .univer sheets/docs/slides/canvas via Facade API.',
+    title: 'Univer Office & Canvas Suite (Univer)',
+    summary: 'Automate spreadsheets, documents, presentations, and visual canvases via Univer APIs.',
   },
   {
     id: 'plugin:ssh',
     prefix: 'ssh_',
-    title: 'SSH Remote Host & Cluster Manager (@linxin666/dsh-ssh)',
-    summary: 'List configured SSH hosts, execute remote commands (ssh_exec), run cluster-wide commands (ssh_cluster), transfer files, and manage port-forwarding tunnels.',
+    title: 'SSH Remote Host & Cluster Manager (SSH)',
+    summary: 'Manage remote SSH hosts, execute remote commands, cluster operations, file transfers, and port forwarding.',
   },
   {
     id: 'plugin:ppt-fusion',
     prefix: 'dsh_ppt_',
-    title: 'DSH PPT Fusion Preview & Review (dsh-ppt-flashmade)',
-    summary: 'Preview PPT slides inside conversation (dsh_ppt_preview), generate draft proposals (dsh_ppt_propose), and mount rendered slides for visual review (dsh_ppt_review).',
+    title: 'Presentation Preview & Review Suite (PPT)',
+    summary: 'Interactive slide presentation preview, draft proposals, and visual review rendering.',
   },
   {
     id: 'plugin:sidebar',
     exact: new Set(['sidebar_open']),
-    title: 'Right Sidebar Integration (dsh-better-sidebar)',
-    summary: 'Open local files, directories, or HTTP(S) web pages directly inside the right sidebar editor, file tree, or embedded browser (sidebar_open).',
+    title: 'Workspace Sidebar Navigation (Sidebar)',
+    summary: 'Open local files, directories, and web pages inside the workspace sidebar.',
   },
 ];
 
@@ -275,44 +278,62 @@ function formatParameterSchema(parameters) {
 /** Companion tools to co-unlock when a specific skill is loaded. */
 function companionToolsForSkill(skillName, allToolNames) {
   const companions = new Set(['skill']);
-  if (skillName.startsWith('univer')) {
-    for (const t of allToolNames) if (t.startsWith('univer_')) companions.add(t);
-    companions.add('present');
-  } else if (skillName === 'open-design-mode') {
-    for (const t of allToolNames) if (t.startsWith('mcp__open-design__')) companions.add(t);
-    companions.add('list_mcp_resources');
-    companions.add('read_mcp_resource');
-  } else if (skillName === 'dsh-ppt-fusion') {
-    for (const t of allToolNames) if (t.startsWith('dsh_ppt_')) companions.add(t);
-    companions.add('present');
-  } else if (skillName === 'reverse-engineer-anything') {
-    for (const t of allToolNames) if (t.startsWith('mcp__rea__')) companions.add(t);
-  } else if (skillName.startsWith('tavily-')) {
-    for (const t of allToolNames) if (t.startsWith('mcp__tavily__')) companions.add(t);
-  } else if (skillName === 'control-browser' || skillName === 'web-gui-tester') {
-    for (const t of allToolNames) if (t.startsWith('mcp__wincu__')) companions.add(t);
-  } else if (
-    skillName.startsWith('office') ||
-    skillName === 'docx' ||
-    skillName === 'pdf' ||
-    skillName === 'pptx' ||
-    skillName === 'xlsx' ||
-    skillName === 'ppt-master'
+  const sLower = String(skillName).toLowerCase();
+
+  // 1. Generic plugin prefix matching (e.g. univer -> univer_*, ppt -> dsh_ppt_*, etc.)
+  for (const t of allToolNames) {
+    if (t.includes('_')) {
+      const prefix = t.split('_')[0].toLowerCase();
+      if (prefix.length >= 3 && sLower.includes(prefix)) {
+        companions.add(t);
+      }
+    }
+  }
+
+  // 2. Generic MCP server linkage (e.g. skillName contains server name -> mcp__${server}__*)
+  for (const t of allToolNames) {
+    if (t.startsWith('mcp__')) {
+      const parts = t.split('__');
+      const server = parts[1]?.toLowerCase();
+      if (server && (sLower.includes(server) || server.includes(sLower))) {
+        companions.add(t);
+      }
+    }
+  }
+
+  // 3. Document, Office, Presentation and Design skills -> file operations + present
+  if (
+    sLower.includes('doc') ||
+    sLower.includes('office') ||
+    sLower.includes('sheet') ||
+    sLower.includes('excel') ||
+    sLower.includes('xlsx') ||
+    sLower.includes('pdf') ||
+    sLower.includes('ppt') ||
+    sLower.includes('design') ||
+    sLower.includes('slide') ||
+    sLower.includes('univer')
   ) {
     if (allToolNames.has('load_workspace_dependencies')) companions.add('load_workspace_dependencies');
     if (allToolNames.has('present')) companions.add('present');
     if (allToolNames.has('read')) companions.add('read');
     if (allToolNames.has('write')) companions.add('write');
     if (allToolNames.has('edit')) companions.add('edit');
-  } else if (
-    skillName === 'cordis-plugin-development' ||
-    skillName === 'editing-cordis-compositions' ||
-    skillName === 'cordis-composition-reference'
-  ) {
+  }
+
+  // 4. MCP resources
+  if (companions.has('list_mcp_resources') || [...companions].some(c => c.startsWith('mcp__'))) {
+    if (allToolNames.has('list_mcp_resources')) companions.add('list_mcp_resources');
+    if (allToolNames.has('read_mcp_resource')) companions.add('read_mcp_resource');
+  }
+
+  // 5. Plugin & Extension development skills
+  if (sLower.includes('plugin') || sLower.includes('cordis') || sLower.includes('preset')) {
     for (const t of ['cordis_inspect_list', 'cordis_inspect_query', 'plugin_manager', 'read', 'write', 'edit', 'glob', 'grep']) {
       if (allToolNames.has(t)) companions.add(t);
     }
   }
+
   return [...companions].filter(t => allToolNames.has(t));
 }
 
@@ -483,17 +504,7 @@ function installLiveCatalogWatcher(ctx, buildInventoryFn, renderCatalogFn, prese
             tools: toolsSummary,
             skills: skillsSummary,
           };
-          try {
-            writeFileSync(
-              join(PACKAGE_DIR, 'catalog-snapshot.json'),
-              JSON.stringify(latestSnapshot, null, 2),
-              'utf8'
-            );
-            const md = renderCatalogFn(inventory, presetScopeKey);
-            writeFileSync(join(PACKAGE_DIR, 'CATALOG.md'), md, 'utf8');
-          } catch {
-            // Ignore write errors if package directory is read-only
-          }
+          // In-memory catalog is refreshed; do not write host machine snapshots to package directory
         }
         return latestSnapshot;
       } catch {
@@ -1261,9 +1272,10 @@ export function apply(ctx, config = {}) {
         '## Quick Operational Guidelines',
         '1. **Direct Unlock (One-step)**: Call `call_directory({ names: [...] })` directly (supports array, comma-separated string, or category aliases):',
         '   - 💻 Standard Coding & Testing: `call_directory({ names: ["core:file", "core:task"] })` (or shorthand `names: ["fs", "task"]`)',
-        '   - 🤖 Task Decomposition & Concurrency: `call_directory({ names: ["core:subagent"] })` (delegate complex/parallel tasks to subagents; do not serialize everything in the main session)',
-        '   - 🌐 Web Search & Fetch: `call_directory({ names: ["mcp:tavily", "core:web"] })`',
-        '   - 🎨 Domain Tasks: Search via `call_directory({ query: "keyword" })` and load the matching `skill`; do not write ad-hoc scripts blindly',
+        '   - 🤖 Subagents & Concurrency: `call_directory({ names: ["core:subagent"] })` (or shorthand `names: ["subagent"]`)',
+        '   - 🌐 Web Access & Presentation: `call_directory({ names: ["core:web"] })` (or shorthand `names: ["web"]`)',
+        '   - 🎨 Domain Tasks & Skills: Search via `call_directory({ query: "keyword" })` and load matching `skill`s; do not write ad-hoc scripts blindly',
+        '   - 🚀 Full Standard Mode: `call_directory({ names: ["*"] })` to expand all tools',
         '2. **Explore & Search**: Overview categories with `call_directory()`; search tools or skills by category or keyword with `call_directory({ query: "..." })`.',
         '3. **Dynamic Pruning (Unload)**: When a heavy milestone completes, reclaim context window by calling `call_directory({ action: "unload", names: [...] })` or `{ action: "reset" }`.',
       ].join('\n'),

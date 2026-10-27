@@ -241,45 +241,15 @@ export function apply(ctx) {
           isPtcMode: false,
         });
 
-        // 1. Write package CATALOG.md & catalog-snapshot.json
+        // Sync workspace-root Call Directory markdown files when in an active user workspace
         try {
-          writeFileSync(join(PACKAGE_DIR, 'catalog-snapshot.json'), JSON.stringify(latestSnapshot, null, 2), 'utf8');
-          writeFileSync(join(PACKAGE_DIR, 'CATALOG.md'), mdContent, 'utf8');
-        } catch {}
-
-        // 2. Write workspace-root Call Directory markdown files
-        try {
-          if (existsSync(workspaceDir)) {
+          if (existsSync(workspaceDir) && workspaceDir !== PACKAGE_DIR) {
             writeFileSync(join(workspaceDir, 'Diffusion Mode Call Directory.md'), mdContent, 'utf8');
             writeFileSync(join(workspaceDir, '扩散模式调用目录.md'), mdContent, 'utf8');
           }
         } catch {}
-
-        // 3. Write preset-status.json
-        try {
-          const selfTest = agentPresets ? await runPresetVerification(ctx, agentPresets) : {};
-          const statusData = {
-            updatedAt: new Date().toISOString(),
-            presets,
-            selfTest,
-            compositions: compositions.map(c => ({
-              id: c.id,
-              moduleCount: c.modules.length,
-              leakedServices: c.leakedServices,
-            })),
-          };
-          writeFileSync(join(PACKAGE_DIR, 'preset-status.json'), JSON.stringify(statusData, null, 2), 'utf8');
-        } catch {}
       }
-    } catch (err) {
-      try {
-        writeFileSync(
-          join(PACKAGE_DIR, 'preset-status.json'),
-          JSON.stringify({ updatedAt: new Date().toISOString(), error: String(err?.stack || err) }, null, 2),
-          'utf8'
-        );
-      } catch {}
-    }
+    } catch {}
   };
 
   const scheduleSync = (delayMs = 250) => {

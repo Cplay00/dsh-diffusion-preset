@@ -49,6 +49,7 @@
     "runtime-v2.js",
     "catalog-builder.js",
     "cordis.patch.yml",
+    "CATALOG.md",
     "locale/*.json",
     "icon.svg",
     "assets/*",
