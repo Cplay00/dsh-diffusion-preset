@@ -1,7 +1,7 @@
 import {
   buildCompleteInventory, createCatalogPolicy, firstLineSummary,
   getScopeOf, normalizeTokenList, quickUnlockLines, renderSkillContent, unwrapService,
-  inferSkillCompanions, classifyTool, getCategoryGuidance,
+  inferSkillCompanions, classifyTool, getCategoryGuidance, toolsForSource,
 } from './catalog-builder.js';
 
 export const name = 'diffusion-controller';
@@ -27,6 +27,11 @@ function companionToolsForSkill(skillName, allToolNames, policy, categories = ne
     }
     const lower = token.toLowerCase();
     const resolved = policy.aliases?.[lower] ?? lower;
+    const sourceTools = [...categories.values()].flatMap(cat => cat.tools).filter(t => t.source === resolved);
+    if (sourceTools.length) {
+      for (const tool of sourceTools) resolvedTools.add(tool.name);
+      continue;
+    }
     if (categories.has(resolved)) {
       const cat = categories.get(resolved);
       for (const t of cat.tools) resolvedTools.add(t.name);
@@ -341,10 +346,10 @@ export function apply(ctx, config = {}) {
     ];
 
     const groups = [
-      { key: 'core', header: '### 1. Built-in Core Tools (Core Tools)' },
+      { key: 'capability', header: '### 1. Functional Capabilities' },
       { key: 'skill', header: '### 2. Domain Skills Repository (Skills)' },
-      { key: 'mcp', header: '### 3. External MCP Services (MCP Servers)' },
-      { key: 'plugin', header: '### 4. Feature Plugins (Feature Plugins)' },
+      { key: 'mcp', header: '### 3. Unclassified MCP Sources' },
+      { key: 'plugin', header: '### 4. Unclassified Plugin Sources' },
     ];
 
     for (const grp of groups) {
@@ -452,18 +457,20 @@ const QUERY_SYNONYMS = {
     const matchedSkills = [];
 
     const includeAllCats = !rawCat || rawCat === 'all' || rawCat === '*';
-    const wantSkillsCat = includeAllCats || rawCat === 'skills' || rawCat === 'skill' || rawCat.startsWith('skill:');
+    const wantSkillsCat = includeAllCats || rawCat === 'skills' || rawCat.startsWith('skill:');
 
     for (const tool of allToolsMap.values()) {
       if (tool.category === 'initial') continue;
       const catMatch =
         includeAllCats ||
+        tool.source?.toLowerCase() === rawCat ||
+        tool.source?.toLowerCase().split(':')[0] === rawCat ||
         tool.category.toLowerCase() === rawCat ||
         tool.category.toLowerCase().split(':')[0] === rawCat ||
         tool.category.toLowerCase().split(':').slice(1).join(':') === rawCat;
       if (!catMatch) continue;
       if (rawTokens.length > 0) {
-        const hay = searchText(`${tool.name} ${tool.category} ${tool.description}`);
+        const hay = searchText(`${tool.name} ${tool.category} ${tool.source ?? ''} ${tool.description}`);
         if (!matchesQuery(hay)) continue;
       }
       matchedTools.push(tool);
@@ -527,7 +534,7 @@ const QUERY_SYNONYMS = {
       lines.push(`- Showing ${offset + 1}-${offset + page.length} of ${matches.length} matches.`, '', '## Candidates');
       for (const item of page) {
         const badge = item.kind === 'skill' ? '[Skill]' : item.unlocked ? '[Unlocked]' : '[Locked]';
-        lines.push(`- \`${item.name}\` ${badge} (${item.category ?? 'skills'}): ${firstLineSummary(item.description, 120)}`);
+        lines.push(`- \`${item.name}\` ${badge} (${item.category ?? 'skills'}${item.source ? '; source: ' + item.source : ''}): ${firstLineSummary(item.description, 120)}`);
       }
 
       if (offset + page.length < matches.length) {
@@ -614,6 +621,12 @@ const QUERY_SYNONYMS = {
 
       if (skillByName.has(resolved)) {
         skillsToLoad.add(resolved);
+        continue;
+      }
+
+      const sourceTools = toolsForSource(allToolsMap, resolved);
+      if (sourceTools.length) {
+        for (const tool of sourceTools) toolsToUnlock.add(tool.name);
         continue;
       }
 
@@ -823,6 +836,11 @@ const QUERY_SYNONYMS = {
           toolsToUnload.add(resolved);
           continue;
         }
+        const sourceTools = toolsForSource(allToolsMap, resolved);
+        if (sourceTools.length) {
+          for (const tool of sourceTools) toolsToUnload.add(tool.name);
+          continue;
+        }
         if (categories.has(resolved)) {
           const cat = categories.get(resolved);
           for (const t of cat.tools) toolsToUnload.add(t.name);
@@ -915,7 +933,7 @@ const QUERY_SYNONYMS = {
         category: {
           type: 'string',
           description:
-            'Lookup filter: registered category ID, alias, family or full suffix, e.g. "core:file" or "mcp". With detail/unload, selects a whole category only without non-empty names.',
+            'Lookup filter: registered category ID, alias, family or full suffix, e.g. "file", "design", "web-search" or source "mcp:tavily"/"mcp". With detail/unload, selects a whole category only without non-empty names.',
         },
         query: {
           type: 'string',

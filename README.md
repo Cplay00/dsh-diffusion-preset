@@ -43,10 +43,10 @@
   - 调用未知扩展工具前，明确建议先使用 `call_directory({ query: "..." })` 进行检索；
   - 智能支持中英文同义词（如搜索 `"文档"` 自动联想 `doc`/`docx`/`office`/`file`，搜索 `"表格"` 联想 `excel`/`xlsx`/`sheet`，搜索 `"爬虫"` 联想 `crawl`/`tavily` 等）。
 - ⚡ **检索后精准调用**：
-  - `call_directory({ category: "core:search" })`：只读浏览文件和代码搜索工具。
+  - `call_directory({ category: "file-search" })`：只读浏览文件和代码搜索工具。
   - `call_directory({ names: ["read", "grep"] })`：只挂载读取与搜索工具。
   - `call_directory({ names: ["subagent"] })`：已注册同名工具时只挂载它，不带出团队工具。
-  - `call_directory({ names: ["core:subagent"] })`：显式挂载委派分类；团队与工作流另行选择。
+  - `call_directory({ names: ["subagent"] })`：显式挂载委派分类；团队与工作流另行选择。
   - `call_directory({ names: ["*"] })`：任务确需全部能力时完整展开。
 - 🔄 **动态卸载收敛**：
   - `call_directory({ action: "unload", names: [...] })`：阶段性任务结束后精准卸载，收缩上下文。
@@ -104,12 +104,12 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 不知道一类工具该如何使用时，先浏览对应分类，例如向 `call_directory` 传入：
 
 ```json
-{"action":"lookup","category":"core:search"}
+{"action":"lookup","category":"file-search"}
 ```
 
 返回的 **Category Workflow** 会说明该类工具的操作顺序和选择原则。例如文件搜索先定位路径、再搜索内容、最后读取相关范围；浏览器操作先确认页面状态、再交互并验证；后台任务、终端会话和智能体则各用自己的状态与控制通道。
 
-14 个内置分类，以及已知插件与 MCP 分类都有对应引导；未知服务和自定义分类会使用通用引导。说明只针对当前作用域实际存在的分类：单一分类的检索或挂载结果按需展开，跨多个分类的宽泛结果不附带整套流程。检索引导不挂载工具，也不会安装缺失服务；模型仍按具体任务选择精确工具，再遵循实际参数 Schema 调用。
+内置能力与已知扩展能力分类都有对应引导；未知服务和自定义分类会使用通用引导。说明只针对当前作用域实际存在的分类：单一分类的检索或挂载结果按需展开，跨多个分类的宽泛结果不附带整套流程。检索引导不挂载工具，也不会安装缺失服务；模型仍按具体任务选择精确工具，再遵循实际参数 Schema 调用。
 
 ---
 
@@ -153,7 +153,7 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 | :--- | :--- | :--- | :--- |
 | **`lookup`** | **只读检索候选** | `{"action":"lookup","query":"表格 excel"}` | **安全探路**：支持中英文同义词联想、空格多关键词匹配。纯只读，绝不会误挂载任何工具。 |
 | **`detail`** | **精准挂载 / 激活技能** | `{"action":"detail","names":["read"]}` | **解锁能力**：挂载指定工具并立即返回其参数规范；挂载技能则加载专业工作流 SOP 指导。 |
-| **`catalog`** | **查看分类大纲** | `{"action":"catalog"}` | **全局俯瞰**：查看当前环境有哪些能力分类（MCP、Plugin、内置核心等）及各自包含的工具数量。 |
+| **`catalog`** | **查看分类大纲** | `{"action":"catalog"}` | **全局俯瞰**：查看当前环境有哪些功能分类（文件、设计、网页检索等）及各自包含的工具数量。 |
 | **`unload`** | **动态卸载工具** | `{"action":"unload","names":["read"]}` | **减负瘦身**：完成某一特定任务后，将临时引入的大型工具从上下文中卸载，节约 Token。 |
 | **`reset`** | **一键重置初始** | `{"action":"reset"}` | **全局归零**：一键恢复到刚启动时的极简工具集，抹平所有临时变更。 |
 
@@ -165,7 +165,7 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 2. **`detail`（挂载）的细节**：
    - **单工具精准挂载（首选推荐）**：如 `names: ["read"]`。系统会返回该工具的完整参数 Schema，此时模型在下一步就可以精准传参，无需猜测。
    - **加载领域技能 ([Skill])**：当检索结果标有 `[Skill]` 时，在名称前加上 `skill:` 前缀传入（如 `names: ["skill:docx"]`），系统会返回该技能的专业 SOP 流程指南。
-   - **整类与通配符挂载（高级批量操作）**：若明确需要某分类的全部工具，可以传分类全名 `names: ["mcp:tavily"]` 或通配符 `names: ["vendor_*"]`，甚至 `names: ["*"]` 全开。建议按需使用，避免一次性涌入过多工具造成上下文拥挤。
+   - **整类与通配符挂载（高级批量操作）**：若明确需要某分类的全部工具，可以传功能分类名 `names: ["web-search"]` 或通配符 `names: ["vendor_*"]`，甚至 `names: ["*"]` 全开。建议按需使用，避免一次性涌入过多工具造成上下文拥挤。
 3. **`unload` 与 `reset`（收拢）的细节**：
    - 按收益收拢，无需在每次微小操作后频繁卸载；在某个完整阶段（如完成了逆向分析、网页抓取等）结束后顺手卸载，收益最高。
 
@@ -180,7 +180,7 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 | **`action`** | `string` | 显式指定五种动作之一；显式动作优先。 | **省略时自动推断**：<br>• 非空 `names` ➜ `detail`（挂载）<br>• 否则非空 `query` 或 `category` ➜ `lookup`（检索）<br>• 均未提供 ➜ `catalog`（大纲） |
 | **`query`** | `string` | 搜索关键词（如 `"git commit"`、`"文档"`）。 | 仅用于 `lookup` 检索，支持中英文同义词。 |
 | **`names`** | `string[]` 或 `string` | 要挂载或卸载的能力名称，如 `["read"]`、`["skill:docx"]`。 | 建议使用数组。非空名称优先于 `category`；`lookup` / `catalog` 忽略此字段。业务参数传给目标工具。 |
-| **`category`** | `string` | 分类过滤 ID 或别名（如 `"core:file"`、`"mcp"`）。 | 在 `lookup` 时作为分类过滤条件；在 `detail`/`unload` 且未提供 `names` 时作为整类操作目标。 |
+| **`category`** | `string` | 功能分类 ID 或别名（如 `"file"`、`"design"`、`"web-search"`），也支持来源 `"mcp:tavily"` 或 `"mcp"`。 | 在 `lookup` 时作为分类过滤条件；在 `detail`/`unload` 且未提供 `names` 时作为整类操作目标。 |
 | **`offset`** | `integer` | 翻页偏移量（从 0 开始，默认为 0）。 | 仅在 `lookup` 时生效。 |
 | **`limit`** | `integer` | 每页返回的候选数量上限（默认 20）。 | 仅在 `lookup` 时生效，带关键词时上限 20，无关键词分类浏览时上限 100。 |
 
@@ -194,24 +194,48 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 
 | 常用中英文别名 (Aliases) | 规范分类 ID | 包含的核心能力与用途 |
 | :--- | :--- | :--- |
-| `fs` / `file` / `文件` / `代码` | `core:file` | 基础文件读写、路径解析、工作目录操作 |
-| `文件搜索` / `代码搜索` | `core:search` | 文件名查找、代码正则检索 (Grep) |
-| `task` / `todo` / `任务` / `待办` / `计划` | `core:task` | 任务规划、澄清与待办管理 (`core:goal`/`job`/`schedule`) |
-| `subagent` / `子智能体` | `core:subagent` | 独立子智能体派发与委托 (`subagent`, `subagent_fork`) |
-| `team` / `teams` / `团队` | `core:team` | 多 Agent 团队协作与任务板 (`spawn_teammate` 等) |
-| `terminal` / `终端` / `shell` | `core:terminal` | 交互式终端会话与长命令执行 |
-| `web` / `search` / `网页` / `搜索` | `core:web` | 网页搜索、网页内容与正文提取 |
-| `dev` / `git` / `worktree` | `core:dev` | Git 工作树操作与宿主管理；普通 Git 命令仍可使用终端 |
-| `office` / `univer` / `文档` / `表格` | `plugin:univer` | Univer 办公套件、Word/Excel 深度交互与文档渲染 |
-| `browser` / `chrome` / `浏览器` | `plugin:browser` | 会话内浏览器自动化与页面操作 |
-| `image` / `canvas` / `图片` / `生图` | `plugin:image-gen` | AI 图像生成、图像编辑与无限画布工作台 |
-| `memory` / `记忆` / `持久化` | `plugin:memory` | 跨会话持久化知识库与记忆图谱 |
-| `market` / `插件市场` | `plugin:market` | DSH 插件市场浏览、安装与更新管理 |
-| `ssh` / `远程` / `服务器` | `plugin:ssh` | SSH 远程主机连接、终端与集群管理 |
-| `taskboard` / `看板` | `plugin:task-board` | 项目任务看板与 GitHub 集成 |
-| `tavily` / `crawl` / `爬虫` / `调研` | `mcp:tavily` | Tavily AI 搜索引擎、结构化爬虫与深度调研 |
-| `rea` / `reverse` / `逆向` / `反编译` | `mcp:rea` | 二进制逆向工程、静态反编译与固件分析 |
-| `design` / `opendesign` / `设计` / `原型` | `mcp:open-design` | OpenDesign UI/UX 设计系统、原型复刻与设计资产提取 |
+| `fs` / `file` / `文件` / `代码` | `file` | 基础文件读写、路径解析、工作目录操作 |
+| `文件搜索` / `代码搜索` | `file-search` | 文件名查找、代码正则检索 (Grep) |
+| `task` / `todo` / `任务` / `待办` / `计划` | `task` | 任务规划、澄清与待办管理；目标、后台任务和定时任务分别属于 `goal`、`job`、`schedule` |
+| `subagent` / `子智能体` | `subagent` | 独立子智能体派发与委托 (`subagent`, `subagent_fork`) |
+| `team` / `teams` / `团队` | `team` | 多 Agent 团队协作与任务板 (`spawn_teammate` 等) |
+| `terminal` / `终端` / `shell` | `terminal` | 交互式终端会话与长命令执行 |
+| `web` / `search` / `tavily` / `crawl` / `extract` / `网页` / `搜索` / `抓取` / `爬虫` / `调研` | `web-search` | 网页搜索、搜索引擎查询、URL 获取、正文提取、站点映射、爬虫与调研；跨提供方统一检索 |
+| `dev` / `git` / `worktree` | `dev` | Git 工作树操作与宿主管理；普通 Git 命令仍可使用终端 |
+| `office` / `univer` / `文档` / `表格` | `office` | 办公文档、表格的读写、交互、渲染与导出 |
+| `browser` / `chrome` / `浏览器` | `browser` | 会话内浏览器自动化与页面操作 |
+| `image` / `canvas` / `图片` / `生图` | `image` | AI 图像生成、图像编辑与无限画布工作台 |
+| `memory` / `记忆` / `持久化` | `memory` | 跨会话持久化知识库与记忆图谱 |
+| `market` / `插件市场` | `market` | DSH 插件市场浏览、安装与更新管理 |
+| `ssh` / `远程` / `服务器` | `ssh` | SSH 远程主机连接、终端与集群管理 |
+| `taskboard` / `看板` | `task-board` | 项目任务看板与 GitHub 集成 |
+| `rea` / `reverse` / `逆向` / `反编译` | `reverse-engineering` | 二进制逆向工程、静态反编译与固件分析 |
+| `design` / `opendesign` / `设计` / `原型` | `design` | UI/UX、设计系统、原型与设计资产；按当前注册工具选择设计服务 |
+| `goal` / `目标` | `goal` | 长期目标追踪 |
+| `job` / `jobs` / `后台任务` | `job` | 后台任务状态、输出与停止 |
+| `schedule` / `定时` | `schedule` | 创建与管理定时任务 |
+| `workflow` / `工作流` | `workflow` | 工作流编排与迭代 |
+| `skill` | `skill` | 技能加载器与运行时依赖定位 |
+| `skills` / `技能` | `skills` | 当前作用域可检索的技能指引 |
+| `session` / `会话` | `session` | 按实际契约检索会话、事件与谱系 |
+| `ppt` / `presentation` / `幻灯片` | `presentation` | 幻灯片预览、提案与评审 |
+| `sidebar` | `sidebar` | 工作区面板导航 |
+| `ui` / `card` | `artifact` | 成果卡片和结构化界面展示 |
+| `desktop` / `computer-use` / `桌面控制` | `computer-use` | 桌面交互与自动化 |
+| `resources` | `resources` | URI 资源及模板发现与读取 |
+| `ops` / `运维` | `ops` | 批量操作与运维能力发现 |
+| `notify` / `通知` | `notify` | 通知发送与展示 |
+| `security` / `安全` | `security` | 安全策略检查与诊断 |
+
+分类 ID 表达用途，工具名称保持宿主原名。`design` 不绑定某一设计产品，`web-search` 合并内置网页搜索与获取、以及已知搜索/抓取服务；是否存在某种能力取决于当前实例注册的工具。`browser` 用于交互式页面操作，`file-search` 用于本地文件检索，成果卡片归入 `artifact`，避免与联网检索混淆。
+
+**来源与旧 ID 兼容**：候选同时标注功能分类和来源，例如 `web-search; source: mcp:tavily`。旧完整 ID（如 `core:web`、`plugin:univer`、`mcp:tavily`、`mcp:open-design`）保留来源选择语义，检索、显式挂载与卸载只作用于该来源，不会扩大到合并后的整类；其中 `core:web` 兼容原有的网页工具及 `present`。新调用推荐用通用功能 ID 浏览，再挂载精确工具名：
+
+```json
+{"action":"lookup","category":"web-search","query":"crawl"}
+```
+
+需要限定提供方时，使用 `category: "mcp:tavily"`。`names: ["web-search"]` 是显式整类挂载，可能包含多个提供方；检索结果不会自动触发这一操作。尚未配置功能映射的服务保留 `mcp:<server>` / `plugin:<prefix>` 来源分组，通过 `sourceCategories` 可归入现有或自定义功能分类。
 
 ---
 
@@ -239,7 +263,7 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 
 ### ⚙️ 通用配置与兼容边界
 
-本项目是 **DSH 预设**，依赖 DSH 的工具、技能、作用域及会话事件协议；不宣称能直接运行于任意 Agent 框架。默认分类与已知服务别名用于兼容现有用法，不要求安装对应服务。
+本项目是 **DSH 预设**，依赖 DSH 的工具、技能、作用域及会话事件协议；不宣称能直接运行于任意 Agent 框架。分类按功能命名，已知服务映射和别名用于归并同类能力，不要求安装对应服务。
 
 Native 与 PTC 预设均显式声明工具呈现模式，不受宿主默认模式影响。目录根据当前作用域实际注册的工具与技能生成，不依赖本机用户名、安装目录、模型提供商或固定的 MCP 服务。
 
@@ -276,9 +300,10 @@ Native 与 PTC 预设均显式声明工具呈现模式，不受宿主默认模�
 | 运行时选项 | 行为 |
 | :--- | :--- |
 | `initialTools` | 替换默认初始工具集。仅实际注册的工具会出现；`call_directory` 始终保留，PTC 还保留 `run_code` 与 `structured_output` 传输工具。 |
-| `categories` | 替换核心分类，格式为 `{ "core:custom": { "title": "Custom", "summary": "...", "guidance": "操作流程，可省略", "tools": ["tool_name"] } }`。分类 ID 使用小写。 |
+| `categories` | 替换精确工具分类，格式为 `{ "custom": { "title": "Custom", "summary": "...", "guidance": "操作流程，可省略", "tools": ["tool_name"] } }`。分类 ID 使用小写。 |
 | `aliases` | 替换别名映射；`{}` 清除默认别名。目标为分类 ID 或工具名称。 |
 | `pluginFamilies` | 替换已知插件规则，支持 `id`、`prefix`、`exact`（名称数组）、`title`、`summary`、可选 `guidance`；`[]` 清除特判。其他带下划线的工具按首段前缀分组。 |
+| `sourceCategories` | 替换来源到功能分类的映射，例如 `{ "mcp:my-search": "web-search", "mcp:my-design": "design" }`；`{}` 清除默认来源映射。精确 `categories.tools` 规则和匹配到的 `pluginFamilies` 分类优先；插件规则的 `id` 为其功能分类，`source` 可选，用于保留来源选择器。未知来源继续独立显示，不猜测其能力。 |
 | `mcpDescriptions` | 替换 MCP 服务说明映射。未知服务仍按 `mcp__<server>__<tool>` 命名发现。 |
 | `categoryGuidance` | 按完整分类 ID 覆盖操作引导，例如 `{ "mcp:my-server": "先检查目标，再选择操作并验证结果" }`；单项设为 `false` 或空字符串可关闭该分类引导，整体 `false` 关闭所有分类引导。不会创建分类或挂载工具。 |
 | `companionGroups` | 默认 `[]`。显式配置后才展开伴随工具组；重叠组会递归展开，可能扩大挂载范围。 |
@@ -362,7 +387,7 @@ In Native mode, call the registered `call_directory` tool with a JSON argument o
 
 Use explicit actions for clarity: `{"action":"lookup","query":"read file"}` discovers candidates; `{"action":"detail","names":["read"]}` mounts the selected tool. Then invoke `read` separately using its actual schema. Mounting does not execute a business operation. Categories and wildcards in `names` deliberately select whole sets; choose exact names for precise mounting and unloading.
 
-Focused single-category lookup/mount results include a **Category Workflow** recipe. Core tools and known plugin/MCP families have specific recipes; unknown or custom categories fall back to their registered contracts. Broad mixed results keep these recipes collapsed. Customize them with `guidance` metadata or `categoryGuidance` overrides, or disable all recipes with `categoryGuidance: false`; none of these options mounts tools or installs services.
+Focused single-category lookup/mount results include a **Category Workflow** recipe. Functional categories merge known core/plugin/MCP capabilities with provider identity retained as source metadata. Categories such as `design` and `web-search` use neutral IDs. Full legacy source IDs retain provider-only selection for lookup, mount and unload. Known capabilities have specific recipes; unknown or custom categories fall back to their registered contracts. Broad mixed results keep these recipes collapsed. Customize them with `guidance` metadata or `categoryGuidance` overrides, or disable all recipes with `categoryGuidance: false`; none of these options mounts tools or installs services.
 
 If `action` is omitted, non-empty `names` selects `detail`, otherwise non-empty `query` or `category` selects `lookup`, otherwise `catalog`. An explicit action takes precedence. Read `report` for unmatched names, ambiguity and skill failures; a successful directory call does not guarantee every requested name matched. See the [full reference](#call-directory) for parameters and examples.
 
