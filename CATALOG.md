@@ -16,23 +16,25 @@ Common scenarios can be unlocked in a single step using category shorthands or d
 
 ---
 
-## 🔄 Progressive Disclosure Lifecycle
+## 🔄 Progressive Disclosure Lifecycle (Search First Recommended)
 
 The progressive expansion lifecycle consists of four lightweight phases:
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
-│ 1. Catalog  │ ──> │  2. Lookup  │ ──> │ 3. Detail & Unlock  │ ──> │  4. Dynamic Unload  │
-│  (Overview) │     │  (Search)   │     │ (Mount into Session)│     │  (Prune / Reset)    │
-└─────────────┘     └─────────────┘     └─────────────────────┘     └─────────────────────┘
+┌─────────────────────┐     ┌─────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│ 1. Search First     │ ──> │ 2. Catalog  │ ──> │ 3. Detail & Unlock  │ ──> │  4. Dynamic Unload  │
+│ (Query & Discovery) │     │  (Overview) │     │ (Mount into Session)│     │  (Prune / Reset)    │
+└─────────────────────┘     └─────────────┘     └─────────────────────┘     └─────────────────────┘
 ```
 
-1. **Catalog (`catalog`)**: `call_directory()`  
-   Returns the top-level categorization of all callable capabilities available in the current DSH environment.
-2. **Lookup (`lookup`)**: `call_directory({ category: "<categoryID>", query: "<keyword>" })`  
-   Searches specific tools or skills by category ID or keyword without dumping large parameter schemas into the context.
+> 💡 **Search First (Recommended)**: Before mounting or calling extended tools, it is strongly recommended to search dynamically installed capabilities in the current harness via `call_directory({ query: "<keyword>" })` (e.g. `query: "git"`, `query: "excel"`, `query: "browser"`, `query: "文档"`). This avoids guessing tool names and guarantees accurate one-step mounting.
+
+1. **Search & Lookup (`lookup`)**: `call_directory({ query: "<keyword>" })`  
+   Searches specific tools or skills by keyword or category across currently installed harness tools without dumping large parameter schemas into the context.
+2. **Catalog (`catalog`)**: `call_directory()`  
+   Returns the top-level categorization of all callable capabilities available in the current DSH environment and high-leverage scenario shortcuts.
 3. **Detail & Unlock (`detail`)**: `call_directory({ names: ["<name1>", "<name2>"] })`  
-   Inspects full parameter schemas and automatically mounts the requested tools or skills into the active session.
+   Inspects full parameter schemas and automatically mounts the requested tools or skills into the active session (with automatic companion cascades).
 4. **Dynamic Unload (`unload` / `reset`)**:  
    - `call_directory({ action: "unload", names: ["<name or category>"] })`: Selectively unloads heavyweight tools to shrink context.
    - `call_directory({ action: "reset" })`: Resets tool visibility to the configured initial surface. Previously returned skill instructions remain in conversation history.

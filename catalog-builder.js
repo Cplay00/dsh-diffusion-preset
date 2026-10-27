@@ -20,11 +20,13 @@ export const COMPANION_GROUPS = [
   ['schedule_create', 'schedule_list', 'schedule_update', 'schedule_delete'],
   ['terminal_open', 'terminal_send', 'terminal_read', 'terminal_signal', 'terminal_close', 'terminal_list'],
   ['session_search', 'session_trace', 'session_event_search', 'session_event_read', 'session_event_trace'],
-  ['cordis_inspect_list', 'cordis_inspect_query'],
+  ['cordis_inspect_list', 'cordis_inspect_query', 'plugin_manager', 'plugin_market'],
   ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource'],
   ['generate_image', 'generate_images', 'edit_image', 'canvas_state', 'view_canvas', 'find_inspiration'],
   ['browser_navigate', 'browser_click', 'browser_type', 'browser_press', 'browser_scroll', 'browser_snapshot', 'browser_screenshot', 'browser_console', 'browser_network', 'browser_tabs', 'browser_close'],
   ['task_board_list', 'task_board_get', 'task_board_create', 'task_board_update', 'task_board_set_parent', 'task_board_run', 'task_board_manage', 'task_board_schedule'],
+  ['univer_new', 'univer_status', 'univer_worktree', 'univer_unit', 'univer_import', 'univer_inspect', 'univer_execute', 'univer_export'],
+  ['ssh_list', 'ssh_exec', 'ssh_upload', 'ssh_download', 'ssh_tunnel', 'ssh_cluster'],
 ];
 
 /** Static metadata for core categories and known plugin/MCP families. */
@@ -74,47 +76,180 @@ export const CATEGORY_META = {
   },
 };
 
-/** Common shorthand aliases for quick category matching and zero-friction calls. */
+/** Common shorthand aliases for quick category matching and zero-friction calls (supports English & Chinese). */
 export const CATEGORY_ALIASES = {
+  // Core: file
   file: 'core:file',
   files: 'core:file',
   fs: 'core:file',
+  code: 'core:file',
+  '文件': 'core:file',
+  '代码': 'core:file',
+
+  // Core: subagent & workflows
   subagent: 'core:subagent',
   subagents: 'core:subagent',
   agent: 'core:subagent',
   agents: 'core:subagent',
   team: 'core:subagent',
+  teams: 'core:subagent',
   workflow: 'core:subagent',
+  ralph: 'core:subagent',
+  '子智能体': 'core:subagent',
+  '智能体': 'core:subagent',
+  '工作流': 'core:subagent',
+  '团队': 'core:subagent',
+
+  // Core: task & planning
   task: 'core:task',
   tasks: 'core:task',
   todo: 'core:task',
   jobs: 'core:task',
   schedule: 'core:task',
+  plan: 'core:task',
+  goal: 'core:task',
+  '任务': 'core:task',
+  '待办': 'core:task',
+  '计划': 'core:task',
+  '目标': 'core:task',
+
+  // Core: web
   web: 'core:web',
   search: 'core:web',
   fetch: 'core:web',
+  browse: 'core:web',
+  '网页': 'core:web',
+  '搜索': 'core:web',
+
+  // Core: dev & terminal
   dev: 'core:dev',
   terminal: 'core:dev',
+  term: 'core:dev',
+  shell: 'core:dev',
+  session: 'core:dev',
+  sessions: 'core:dev',
+  git: 'core:dev',
+  worktree: 'core:dev',
+  '终端': 'core:dev',
+  '会话': 'core:dev',
+  '开发': 'core:dev',
+
+  // Core: skill
   skill: 'core:skill',
   skills: 'skills',
+  '技能': 'skills',
+
+  // Feature plugins & MCP aliases
   univer: 'plugin:univer',
+  office: 'plugin:univer',
+  doc: 'plugin:univer',
+  docs: 'plugin:univer',
+  docx: 'plugin:univer',
+  excel: 'plugin:univer',
+  xlsx: 'plugin:univer',
+  sheet: 'plugin:univer',
+  sheets: 'plugin:univer',
+  pdf: 'plugin:univer',
+  '文档': 'plugin:univer',
+  '表格': 'plugin:univer',
+  '办公': 'plugin:univer',
+
   ssh: 'plugin:ssh',
+  remote: 'plugin:ssh',
+  server: 'plugin:ssh',
+  '远程': 'plugin:ssh',
+  '服务器': 'plugin:ssh',
+
   ppt: 'plugin:ppt-fusion',
   'ppt-fusion': 'plugin:ppt-fusion',
+  presentation: 'plugin:ppt-fusion',
+  '幻灯片': 'plugin:ppt-fusion',
+
   sidebar: 'plugin:sidebar',
+
   browser: 'plugin:browser',
+  chrome: 'plugin:browser',
+  webpage: 'plugin:browser',
+  kimi: 'plugin:browser',
+  '浏览器': 'plugin:browser',
+  '网页控制': 'plugin:browser',
+
   image: 'plugin:image-gen',
   images: 'plugin:image-gen',
   canvas: 'plugin:image-gen',
+  draw: 'plugin:image-gen',
+  paint: 'plugin:image-gen',
+  '图片': 'plugin:image-gen',
+  '生图': 'plugin:image-gen',
+  '图像': 'plugin:image-gen',
+  '画布': 'plugin:image-gen',
+  '绘画': 'plugin:image-gen',
+
   taskboard: 'plugin:task-board',
   'task-board': 'plugin:task-board',
   board: 'plugin:task-board',
+  '看板': 'plugin:task-board',
+
   ui: 'plugin:ui',
-  tavily: 'mcp:tavily',
+  card: 'plugin:ui',
+
+  market: 'plugin:market',
+  marketplace: 'plugin:market',
+  dshmarket: 'plugin:market',
+  plugin: 'plugin:market',
+  plugins: 'plugin:market',
+  '插件': 'plugin:market',
+  '市场': 'plugin:market',
+  '插件市场': 'plugin:market',
+
+  memory: 'plugin:memory',
+  remember: 'plugin:memory',
+  knowledge: 'plugin:memory',
+  viking: 'plugin:memory',
+  openviking: 'plugin:memory',
+  hindsight: 'plugin:memory',
+  '记忆': 'plugin:memory',
+  '持久化': 'plugin:memory',
+
+  ops: 'plugin:ops',
+  '运维': 'plugin:ops',
+
+  notify: 'plugin:notify',
+  notification: 'plugin:notify',
+  toast: 'plugin:notify',
+  '通知': 'plugin:notify',
+
+  security: 'plugin:security',
+  safety: 'plugin:security',
+  '安全': 'plugin:security',
+
   wincu: 'mcp:wincu',
+  'computer-use': 'mcp:wincu',
+  cu: 'mcp:wincu',
+  desktop: 'mcp:wincu',
+  '桌面': 'mcp:wincu',
+  '桌面控制': 'mcp:wincu',
+
+  tavily: 'mcp:tavily',
+  crawl: 'mcp:tavily',
+  extract: 'mcp:tavily',
+  '爬虫': 'mcp:tavily',
+  '调研': 'mcp:tavily',
+
   rea: 'mcp:rea',
+  reverse: 'mcp:rea',
+  binary: 'mcp:rea',
+  disasm: 'mcp:rea',
+  '逆向': 'mcp:rea',
+  '反编译': 'mcp:rea',
+
   opendesign: 'mcp:open-design',
   'open-design': 'mcp:open-design',
+  design: 'mcp:open-design',
+  prototype: 'mcp:open-design',
+  '设计': 'mcp:open-design',
+  '原型': 'mcp:open-design',
+
   resources: 'mcp:resources',
 };
 
@@ -142,6 +277,8 @@ export const KNOWN_MCP_DESCRIPTIONS = {
   'tavily': 'AI-optimized real-time web search, content extraction, and deep research.',
   'rea': 'Reverse engineering, binary analysis, and disassembly tools.',
   'open-design': 'Design workspace for UI/UX, interactive prototypes, and design systems.',
+  'wincu': 'Windows Computer Use automation: direct mouse, keyboard, accessibility tree, and window control.',
+  'resources': 'List and read URI resources and parameterized templates provided by MCP servers.',
 };
 
 export const KNOWN_PLUGIN_FAMILIES = [
@@ -192,6 +329,46 @@ export const KNOWN_PLUGIN_FAMILIES = [
     exact: new Set(['ui_present']),
     title: 'Interactive UI Presentation (UI)',
     summary: 'Present self-contained interactive HTML/CSS UI cards and receive user actions in real time.',
+  },
+  {
+    id: 'plugin:market',
+    prefix: 'market_',
+    exact: new Set(['plugin_market', 'plugin_manager']),
+    title: 'Plugin Market & Extension Center (Market & Extensions)',
+    summary: 'Discover, search, install, update, and manage plugins and presets from dsh-market and npm.',
+  },
+  {
+    id: 'plugin:memory',
+    prefix: 'memory_',
+    exact: new Set(['openviking_search', 'openviking_read', 'hindsight_remember', 'hindsight_recall']),
+    title: 'Persistent Memory & Long-term Context (Memory & Knowledge)',
+    summary: 'Cross-session project memory, persistent entity graphs, experience retrieval, and knowledge retention.',
+  },
+  {
+    id: 'plugin:ops',
+    prefix: 'ops_',
+    title: 'Batch Operations & Tool Discovery (DSH Ops)',
+    summary: 'Batch file reading, real-time tool discovery, and operations shell commands.',
+  },
+  {
+    id: 'plugin:computer-use',
+    prefix: 'windows_computer_use_',
+    exact: new Set(['cu_click', 'cu_type', 'cu_screenshot']),
+    title: 'Windows Desktop Automation & Computer Use (Computer Use)',
+    summary: 'Direct mouse and keyboard actions, accessibility tree inspection, and desktop window automation.',
+  },
+  {
+    id: 'plugin:notify',
+    prefix: 'notify_',
+    title: 'Desktop & System Notifications (Notifications)',
+    summary: 'Send desktop toasts, visual banners, and alert notifications.',
+  },
+  {
+    id: 'plugin:security',
+    prefix: 'safety_',
+    exact: new Set(['diagnose_windows_sandbox_acl']),
+    title: 'Security Sandbox & Safety Net (Security & Safety)',
+    summary: 'Command safety net, sandbox ACL diagnosis, and permission policy guards.',
   },
 ];
 
@@ -289,19 +466,126 @@ export function firstLineSummary(text, maxLen = 140) {
   return `${clean.slice(0, maxLen - 1)}…`;
 }
 
-/** Recommend only categories that actually exist in this inventory. */
+/** Recommend scenario-based shortcuts and installed categories in this inventory. */
 export function quickUnlockLines(inventory) {
-  const ids = [...inventory.categories.keys()];
+  const ids = new Set(inventory.categories.keys());
   const lines = [];
-  if (ids.includes('core:file') && ids.includes('core:task')) {
+
+  // High-leverage domain scenario shortcuts based on currently discovered capabilities
+  if (ids.has('core:file') && ids.has('core:task')) {
     lines.push('- 💻 **Coding & Tasks**: `call_directory({ names: ["core:file", "core:task"] })`');
+  } else if (ids.has('core:file')) {
+    lines.push('- 💻 **File Operations & Code Search**: `call_directory({ names: ["core:file"] })`');
   }
+
+  if (ids.has('core:subagent')) {
+    lines.push('- 🤖 **Subagents & Team Workflows**: `call_directory({ names: ["core:subagent"] })`');
+  }
+  if (ids.has('plugin:univer')) {
+    lines.push('- 📄 **Office & Documents (Univer)**: `call_directory({ names: ["plugin:univer"] })`');
+  }
+  if (ids.has('plugin:browser')) {
+    lines.push('- 🌐 **Browser Automation (Browser)**: `call_directory({ names: ["plugin:browser"] })`');
+  }
+  if (ids.has('plugin:image-gen')) {
+    lines.push('- 🎨 **AI Image Generation & Canvas**: `call_directory({ names: ["plugin:image-gen"] })`');
+  }
+  if (ids.has('plugin:memory')) {
+    lines.push('- 🧠 **Persistent Memory & Context**: `call_directory({ names: ["plugin:memory"] })`');
+  }
+  if (ids.has('plugin:market')) {
+    lines.push('- 🔌 **Plugin Market & Extensions**: `call_directory({ names: ["plugin:market"] })`');
+  }
+  if (ids.has('plugin:ssh')) {
+    lines.push('- ⚡ **SSH & Remote Cluster**: `call_directory({ names: ["plugin:ssh"] })`');
+  }
+  if (ids.has('mcp:tavily')) {
+    lines.push('- 🔍 **Tavily AI Search & Research**: `call_directory({ names: ["mcp:tavily"] })`');
+  }
+  if (ids.has('mcp:open-design')) {
+    lines.push('- 🎨 **OpenDesign UI/UX Workspace**: `call_directory({ names: ["mcp:open-design"] })`');
+  }
+  if (ids.has('mcp:rea')) {
+    lines.push('- 🔬 **Reverse Engineering (REA)**: `call_directory({ names: ["mcp:rea"] })`');
+  }
+  if (ids.has('skills')) {
+    lines.push('- 🎯 **Domain Skills Repository**: `call_directory({ names: ["skills"] })`');
+  }
+
+  // Discoverable categories not yet covered above
+  const standardCovered = new Set([
+    'core:file', 'core:task', 'core:subagent',
+    'plugin:univer', 'plugin:browser', 'plugin:image-gen',
+    'plugin:memory', 'plugin:market', 'plugin:ssh',
+    'mcp:tavily', 'mcp:open-design', 'mcp:rea', 'skills',
+  ]);
+
   for (const id of ids) {
-    const category = inventory.categories.get(id);
-    lines.push(`- **${category.title}**: \`call_directory({ names: [${JSON.stringify(id)}] })\``);
+    if (!standardCovered.has(id)) {
+      const category = inventory.categories.get(id);
+      if (category) {
+        lines.push(`- **${category.title}**: \`call_directory({ names: [${JSON.stringify(id)}] })\``);
+      }
+    }
   }
+
   lines.push('- 🚀 **Full Tool Unlock**: `call_directory({ names: ["*"] })`');
   return lines;
+}
+
+/** Heuristically infer required companion tools based on skill domain keywords (using word boundaries). */
+export function inferSkillCompanions(skill) {
+  if (!skill) return [];
+  const text = `${skill.name || ''} ${skill.description || ''}`.toLowerCase();
+  const companions = new Set();
+  if (/\b(docx?|word|document)\b/.test(text)) {
+    companions.add('load_workspace_dependencies');
+    companions.add('read');
+    companions.add('write');
+    companions.add('edit');
+  }
+  if (/\b(xlsx?|excel|spreadsheet|csv)\b/.test(text)) {
+    companions.add('load_workspace_dependencies');
+    companions.add('read');
+    companions.add('write');
+    companions.add('edit');
+  }
+  if (/\b(pptx?|ppt|presentation|slides?)\b/.test(text)) {
+    companions.add('load_workspace_dependencies');
+    companions.add('read');
+    companions.add('write');
+    companions.add('edit');
+    companions.add('generate_image');
+  }
+  if (/\bpdf\b/.test(text)) {
+    companions.add('load_workspace_dependencies');
+    companions.add('read');
+    companions.add('write');
+    companions.add('edit');
+  }
+  if (/\b(browser|webpage|chrome|playwright|puppeteer)\b/.test(text)) {
+    companions.add('plugin:browser');
+  }
+  if (/\b(tavily|crawl|extract|research)\b/.test(text)) {
+    companions.add('mcp:tavily');
+  }
+  if (/\b(git|worktree)\b/.test(text)) {
+    companions.add('create_worktree');
+    companions.add('core:file');
+  }
+  if (/\b(open-design|design system|figma)\b/.test(text)) {
+    companions.add('mcp:open-design');
+  }
+  if (/\b(memory|openviking|hindsight)\b/.test(text)) {
+    companions.add('plugin:memory');
+  }
+  if (/\b(reverse engineer|disassembly|ghidra|frida|binary)\b/.test(text)) {
+    companions.add('mcp:rea');
+  }
+  if (/\buniver\b/.test(text)) {
+    companions.add('plugin:univer');
+  }
+  return [...companions];
 }
 
 export function classifyTool(toolName, policy = createCatalogPolicy()) {
@@ -325,6 +609,20 @@ export function classifyTool(toolName, policy = createCatalogPolicy()) {
   for (const [catId, meta] of Object.entries(policy.categories)) {
     if (meta.tools.has(toolName)) return catId;
   }
+
+  // Dynamic heuristics for tools discovered from installed plugins
+  const lower = toolName.toLowerCase();
+  if (lower.includes('memory') || lower.includes('viking') || lower.includes('hindsight')) return 'plugin:memory';
+  if (lower.includes('market') || lower.startsWith('plugin_')) return 'plugin:market';
+  if (lower.startsWith('ops_')) return 'plugin:ops';
+  if (lower.startsWith('windows_computer_use_') || lower.startsWith('cu_')) return 'plugin:computer-use';
+  if (lower.startsWith('notify_') || lower.startsWith('toast_')) return 'plugin:notify';
+  if (lower.startsWith('safety_')) return 'plugin:security';
+  if (lower.startsWith('git_') || lower.startsWith('worktree_')) return 'core:dev';
+  if (lower.startsWith('browser_') || lower.startsWith('webbridge_')) return 'plugin:browser';
+  if (lower.startsWith('canvas_') || lower.startsWith('image_') || lower.startsWith('draw_')) return 'plugin:image-gen';
+  if (lower.startsWith('univer_') || lower.startsWith('office_')) return 'plugin:univer';
+
   const separator = toolName.indexOf('_');
   return separator > 0 ? `plugin:${toolName.slice(0, separator).toLowerCase()}` : 'plugin:other';
 }
@@ -480,11 +778,13 @@ export async function buildCompleteInventory(ctx, targetScope, signal, options =
         });
       } else {
         const family = policy.pluginFamilies.find(f => f.id === tool.category);
+        const rawFamilyName = tool.category.startsWith('plugin:') ? tool.category.slice(7) : tool.category;
+        const formattedTitle = `${rawFamilyName.charAt(0).toUpperCase() + rawFamilyName.slice(1)} Tools (${tool.category})`;
         categories.set(tool.category, {
           id: tool.category,
           kind: 'plugin',
-          title: family?.title ?? `Feature Plugin Tools (${tool.category})`,
-          summary: family?.summary ?? 'Extended plugin tools installed in the current profile.',
+          title: family?.title ?? formattedTitle,
+          summary: family?.summary ?? `Extended plugin tools discovered in the current harness profile (${tool.category}).`,
           tools: [],
           skills: [],
         });

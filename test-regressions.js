@@ -458,6 +458,71 @@ test('skill case-insensitivity with skill: prefix and default skill companions u
   assert(h.visible(agent).includes('load_workspace_dependencies'));
 });
 
+test('multilingual keyword search and prominent search-first recommendations', async t => {
+  const h = harness(t, {}, { names: ['read', 'write', 'browser_navigate', 'generate_image', 'memory_store'] });
+  const agent = h.agent();
+
+  // Catalog highlights Search First recommendation
+  const catalog = await h.call(agent, { action: 'catalog' });
+  assert.match(catalog.report, /Search First \(Recommended\)/);
+
+  // Guide highlights Search First recommendation
+  assert.match(h.ctx.guide.text(), /Search First \(Recommended\)/);
+
+  // Chinese keyword query "文档" matches 'read' and 'write'
+  const lookupDoc = await h.call(agent, { action: 'lookup', query: '文档' });
+  assert.match(lookupDoc.report, /`read`/);
+  assert.match(lookupDoc.report, /`write`/);
+  assert.match(lookupDoc.report, /Search First \(Recommended\)/);
+
+  // Chinese keyword query "浏览器" matches 'browser_navigate'
+  const lookupBrowser = await h.call(agent, { action: 'lookup', query: '浏览器' });
+  assert.match(lookupBrowser.report, /`browser_navigate`/);
+
+  // Chinese category aliases mounting
+  const mountFiles = await h.call(agent, { names: ['文件'] });
+  assert(mountFiles.unlocked.includes('read'));
+  assert(mountFiles.unlocked.includes('write'));
+  assert(h.visible(agent).includes('read'));
+
+  // Pre-execute waterfall blocks locked tool with search recommendation
+  const preExecuteHooks = h.hooks.get('tools/pre-execute') || [];
+  assert(preExecuteHooks.length > 0, 'tools/pre-execute hook must be registered');
+  const lockedExec = { agent, name: 'browser_navigate' };
+  let passedNext = false;
+  const decision = await preExecuteHooks[0](lockedExec, async () => { passedNext = true; return { kind: 'allow' }; });
+  assert.equal(passedNext, false);
+  assert.equal(decision.kind, 'block');
+  assert.match(decision.feedback[0].text, /Recommendation: Search capabilities with `call_directory\(\{ query: "browser_navigate" \}\)`/);
+});
+
+test('dynamic classification and heuristic companion deduction for installed capabilities', async t => {
+  const h = harness(t, {}, { names: ['memory_store', 'ops_check', 'custom_tool'] });
+  const agent = h.agent();
+
+  // Dynamic classification of memory and ops tools
+  const inv = await buildCompleteInventory(h.ctx);
+  assert.equal(inv.allToolsMap.get('memory_store').category, 'plugin:memory');
+  assert.equal(inv.allToolsMap.get('ops_check').category, 'plugin:ops');
+  assert.equal(inv.allToolsMap.get('custom_tool').category, 'plugin:custom');
+
+  // Dynamic skill companion inference
+  h.skillDefs.set('custom-spreadsheet-analyzer', {
+    name: 'custom-spreadsheet-analyzer',
+    description: 'Analyze complex Excel and CSV spreadsheets',
+    content: 'Inspect rows and cells',
+  });
+  h.definitions.set('load_workspace_dependencies', { name: 'load_workspace_dependencies', description: 'Load dependencies' });
+  h.definitions.set('read', { name: 'read', description: 'Read file' });
+  h.definitions.set('write', { name: 'write', description: 'Write file' });
+  h.definitions.set('edit', { name: 'edit', description: 'Edit file' });
+
+  const skillResult = await h.call(agent, { names: ['custom-spreadsheet-analyzer'] });
+  assert(skillResult.loadedSkills.includes('custom-spreadsheet-analyzer'));
+  assert(skillResult.unlocked.includes('read'));
+  assert(skillResult.unlocked.includes('load_workspace_dependencies'));
+});
+
 function temporaryDirectory(t) {
   const directory = mkdtempSync(join(tmpdir(), 'diffusion-regression-'));
   t.after(() => {

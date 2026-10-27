@@ -1,6 +1,7 @@
 import {
   buildCompleteInventory, createCatalogPolicy, firstLineSummary,
   getScopeOf, normalizeTokenList, quickUnlockLines, renderSkillContent, unwrapService,
+  inferSkillCompanions, classifyTool,
 } from './catalog-builder.js';
 
 export const name = 'diffusion-controller';
@@ -61,9 +62,11 @@ function formatParameterSchema(parameters) {
   return lines.join('\n');
 }
 
-/** Dependencies are declared explicitly, never inferred from skill names. */
-function companionToolsForSkill(skillName, allToolNames, policy, categories = new Map()) {
-  const rawList = normalizeTokenList(policy.skillCompanions[skillName]);
+/** Dependencies are declared explicitly or inferred from skill domain keywords. */
+function companionToolsForSkill(skillName, allToolNames, policy, categories = new Map(), skillObj = null) {
+  const declaredList = normalizeTokenList(policy.skillCompanions[skillName]);
+  const inferredList = (skillObj && policy.inferSkillCompanions !== false) ? inferSkillCompanions(skillObj) : [];
+  const rawList = [...new Set([...declaredList, ...inferredList])];
   const resolvedTools = new Set(['skill']);
   for (const token of rawList) {
     if (allToolNames.has(token)) {
@@ -357,15 +360,17 @@ export function apply(ctx, config = {}) {
     const lines = [
       `# Diffusion Mode · Call Directory (${isPtcMode ? 'PTC Mode' : 'Standard Mode'})`,
       '',
+      `> 💡 **Search First (Recommended)**: Before mounting or calling unfamiliar capabilities, use \`call_directory({ query: "<keyword>" })\` to search dynamically installed tools and skills in this harness.`,
+      '',
       `- **Currently Available Basic Tools**: ${initialList.map(t => `\`${t}\``).join(', ')}`,
       `- **Total Capabilities in Environment**: **${totalTools}** extended tools (**${unlockedCount}** unlocked) + **${skills.length}** domain skills (Skills)`,
       '',
       '## ⚡ Quick Unlocks (Common Scenarios)',
       ...quickUnlockLines(inventory),
       '',
-      '## 1. Progressive Disclosure Flow (Catalog → Lookup → Detail/Unlock → Unload)',
-      '1. **Catalog (`catalog`)**: `call_directory()` — Overview all capability categories and recommended shortcuts.',
-      '2. **Lookup (`lookup`)**: `call_directory({ query: "<keyword>" })` — Search specific tool/skill names by category or keyword.',
+      '## 1. Progressive Disclosure Flow (Search First → Mount → Execute → Unload)',
+      '1. **Search (Recommended)**: `call_directory({ query: "<keyword>" })` — Discover exact tool & skill names installed in this harness.',
+      '2. **Catalog (`catalog`)**: `call_directory()` — Overview all currently active capability categories and shortcuts.',
       '3. **Detail & Unlock (`detail`)**: `call_directory({ names: ["<name or category>"] })` — Unlock and mount tools/skills immediately (supports aliases and wildcard `*`).',
       '4. **Dynamic Unload (`unload`)**: `call_directory({ action: "unload", names: ["<name or category>"] })` — Prune tools from context to keep it lightweight.',
       '',
@@ -409,6 +414,56 @@ export function apply(ctx, config = {}) {
     return lines.join('\n');
   }
 
+  
+/** Multilingual query synonym mapping for intelligent search across tools and skills. */
+const QUERY_SYNONYMS = {
+  // Office, Files & Documents
+  '文档': ['doc', 'docx', 'document', 'word', 'office', 'univer', 'file', 'read'],
+  '文件': ['file', 'read', 'write', 'edit', 'doc', 'document', 'code'],
+  '表格': ['sheet', 'excel', 'xlsx', 'table', 'csv', 'univer'],
+  '幻灯片': ['ppt', 'pptx', 'slide', 'presentation'],
+  'pdf': ['pdf', 'document'],
+  'office': ['doc', 'docx', 'sheet', 'xlsx', 'ppt', 'univer'],
+  'excel': ['sheet', 'xlsx', 'spreadsheet', 'csv', 'univer'],
+  'word': ['doc', 'docx', 'document'],
+
+  // Browsing & Web
+  '浏览器': ['browser', 'web', 'navigate', 'chrome', 'tab'],
+  '网页': ['web', 'browser', 'fetch', 'url', 'page'],
+  'browser': ['web', 'tab', 'navigate', 'chrome', 'snapshot'],
+  '爬虫': ['crawl', 'extract', 'scrape', 'tavily', 'spider'],
+  '搜索': ['search', 'find', 'query', 'tavily', 'web'],
+
+  // Vision & Design
+  '图片': ['image', 'canvas', 'draw', 'paint', 'picture', 'photo'],
+  '生图': ['image', 'generate_image', 'canvas', 'draw'],
+  '画布': ['canvas', 'image', 'draw'],
+  '设计': ['design', 'ui', 'prototype', 'opendesign'],
+
+  // Dev, Terminal & Git
+  '代码': ['code', 'file', 'git', 'grep', 'glob', 'read', 'write'],
+  '终端': ['terminal', 'shell', 'bash', 'pwsh', 'exec'],
+  '会话': ['session', 'history', 'event', 'trace'],
+  'git': ['worktree', 'branch', 'repo'],
+
+  // Memory & Knowledge
+  '记忆': ['memory', 'viking', 'hindsight', 'session', 'recall'],
+  'memory': ['viking', 'hindsight', 'recall', 'store'],
+
+  // Market & Plugins
+  '市场': ['market', 'plugin', 'dshmarket', 'extension'],
+  '插件': ['plugin', 'market', 'extension', 'manager'],
+
+  // Remote & SSH
+  '远程': ['ssh', 'remote', 'server', 'tunnel'],
+  'ssh': ['remote', 'server', 'tunnel'],
+
+  // Reverse engineering & Security
+  '逆向': ['rea', 'reverse', 'binary', 'disasm'],
+  '安全': ['safety', 'audit', 'guard', 'sandbox', 'acl'],
+  '桌面': ['computer_use', 'wincu', 'desktop', 'mouse'],
+};
+
   /** Stage 2: Lookup specific names and descriptions by category and/or keyword query. */
   function renderLookupStage(inventory, args) {
     const { allToolsMap, skills } = inventory;
@@ -420,7 +475,14 @@ export function apply(ctx, config = {}) {
     let rawCat = (args.category ?? '').trim().toLowerCase();
     if (CATEGORY_ALIASES[rawCat]) rawCat = CATEGORY_ALIASES[rawCat].toLowerCase();
     const rawQuery = (args.query ?? '').trim().toLowerCase();
-    const keywords = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
+    const rawTokens = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
+    const expandedSynonyms = new Set();
+    for (const token of rawTokens) {
+      const syns = QUERY_SYNONYMS[token];
+      if (Array.isArray(syns)) {
+        for (const s of syns) expandedSynonyms.add(s.toLowerCase());
+      }
+    }
 
     const matchedTools = [];
     const matchedSkills = [];
@@ -436,26 +498,39 @@ export function apply(ctx, config = {}) {
         tool.category.toLowerCase().includes(rawCat) ||
         tool.name.toLowerCase().includes(rawCat);
       if (!catMatch) continue;
-      if (keywords.length > 0) {
+      if (rawTokens.length > 0) {
         const hay = `${tool.name} ${tool.category} ${tool.description}`.toLowerCase();
-        if (!keywords.every(kw => hay.includes(kw))) continue;
+        const matchesOriginal = rawTokens.every(kw => hay.includes(kw));
+        const matchesSynonym = [...expandedSynonyms].some(s => hay.includes(s));
+        if (!matchesOriginal && !matchesSynonym) continue;
       }
       matchedTools.push(tool);
     }
 
-    if (wantSkillsCat || keywords.length > 0) {
+    if (wantSkillsCat || rawTokens.length > 0) {
       for (const skill of skills) {
         if (!wantSkillsCat && rawCat && !skill.name.toLowerCase().includes(rawCat)) continue;
-        if (keywords.length > 0) {
+        if (rawTokens.length > 0) {
           const hay = `${skill.name} ${skill.description}`.toLowerCase();
-          if (!keywords.every(kw => hay.includes(kw))) continue;
+          const matchesOriginal = rawTokens.every(kw => hay.includes(kw));
+          const matchesSynonym = [...expandedSynonyms].some(s => hay.includes(s));
+          if (!matchesOriginal && !matchesSynonym) continue;
         }
         matchedSkills.push(skill);
       }
     }
 
-    const rank = item => item.name.toLowerCase() === rawQuery ? 0
-      : rawQuery && item.name.toLowerCase().startsWith(rawQuery) ? 1 : 2;
+    const rank = item => {
+      const nLower = item.name.toLowerCase();
+      if (nLower === rawQuery) return 0;
+      if (rawQuery && nLower.startsWith(rawQuery)) return 1;
+      if (rawTokens.length > 0 && rawTokens.every(kw => nLower.includes(kw))) return 2;
+      const catLower = (item.category || '').toLowerCase();
+      if (rawTokens.length > 0 && rawTokens.every(kw => catLower.includes(kw))) return 3;
+      if ([...expandedSynonyms].some(s => nLower.includes(s))) return 4;
+      if ([...expandedSynonyms].some(s => catLower.includes(s))) return 5;
+      return 6;
+    };
     const matches = [
       ...matchedTools.map(item => ({ ...item, kind: 'tool' })),
       ...matchedSkills.map(item => ({ ...item, kind: 'skill' })),
@@ -501,7 +576,8 @@ export function apply(ctx, config = {}) {
       '',
       '## Next Step: Mount Directly',
       `- Select only the exact capability needed, e.g. \`call_directory({ names: [${JSON.stringify(target)}] })\`.`,
-      '- Search results are candidates, not a batch mount request.'
+      '- Search results are candidates, not a batch mount request.',
+      '> 💡 **Search First (Recommended)**: You can query other keywords anytime via `call_directory({ query: "<keyword>" })` before mounting.'
     );
 
     return lines.join('\n');
@@ -643,8 +719,9 @@ export function apply(ctx, config = {}) {
       }
     }
 
-    for (const { name: sName } of loadedSkills) {
-      for (const comp of companionToolsForSkill(sName, allToolNames, policy, categories)) {
+    for (const loaded of loadedSkills) {
+      const sName = loaded.name;
+      for (const comp of companionToolsForSkill(sName, allToolNames, policy, categories, loaded)) {
         toolsToUnlock.add(comp);
       }
     }
@@ -699,7 +776,7 @@ export function apply(ctx, config = {}) {
     if (unmatched.length > 0) {
       lines.push(
         '',
-        `⚠️ **The following names were not found**: ${unmatched.map(u => `\`${u}\``).join(', ')}. Use \`call_directory({ query: "..." })\` to look up exact names.`
+        `⚠️ **The following names were not found**: ${unmatched.map(u => `\`${u}\``).join(', ')}. 💡 **Recommendation**: Before calling, search currently installed capabilities via \`call_directory({ query: "<keyword>" })\`.`
       );
     }
 
@@ -983,15 +1060,19 @@ export function apply(ctx, config = {}) {
       [
         `# Diffusion Mode (${isPtcMode ? 'PTC Edition' : 'Standard Edition'}) · Progressive Workflow`,
         '',
-        'The current session runs in **Diffusion Mode**. The directory lists the configured initial tools and available capabilities in this session. Extended tools can be unlocked and unloaded on demand.',
+        'The current session runs in **Diffusion Mode**, starting with minimal essential tools and progressively expanding on demand to keep context lean and focused.',
         '',
-        '## Quick Operational Guidelines',
-        '1. **Direct Unlock (One-step)**: Call `call_directory({ names: [...] })` directly (supports array, comma-separated string, or category aliases):',
-        '   - Inspect available categories with `call_directory()` before selecting a tool or category name.',
-        '   - 🎨 Domain Tasks & Skills: Search via `call_directory({ query: "keyword" })` for relevant registered skills',
-        '   - 🚀 Full Standard Mode: `call_directory({ names: ["*"] })` to expand all tools',
-        '2. **Explore & Search**: `call_directory({ query: "..." })` lists matching candidate tools and skills without parameter schemas or skill bodies. Use offset/limit to page large results, then mount only needed exact names. Lookup never mounts tools or loads skill bodies.',
-        '3. **Dynamic Pruning (Unload)**: Remove tool definitions from subsequent requests with `call_directory({ action: "unload", names: [...] })` or `{ action: "reset" }`. Existing conversation history is retained.',
+        '## ⚡ Operating Guidelines (Search First Recommended)',
+        '1. 🔍 **Search First (Recommended)**: Before calling extended tools or when unsure of exact tool names in this harness, search first via `call_directory({ query: "<keyword>" })` (e.g. `query: "git"`, `query: "excel"`, `query: "browser"`). Inspect available categories with `call_directory()`. Lookup is lightweight and never dumps schemas.',
+        '2. 🚀 **Direct Mount**: Once the exact tool name or category alias is known, mount directly in one step: `call_directory({ names: [...] })` (e.g. `names: ["fs", "task"]`, `names: ["browser"]`, or wildcard `names: ["*"]` for full mode). Associated companions cascade-mount automatically.',
+        '3. 🧹 **Dynamic Pruning**: When completing a major milestone, call `call_directory({ action: "unload", names: [...] })` or `{ action: "reset" }` to prune tokens and keep long-horizon context crisp.',
+        '',
+        '## 🧭 Common Intent Shortcuts (Direct Mount)',
+        '- 💻 **Code & Files**: `names: ["fs"]` | 📋 **Tasks & Goals**: `names: ["task"]`',
+        '- 🤖 **Subagents & Team**: `names: ["subagent"]` | 📄 **Office & Docs**: `names: ["office"]`',
+        '- 🌐 **Browser & Web**: `names: ["browser", "web"]` | 🎨 **Image & UI**: `names: ["image", "ui"]`',
+        '- 🧠 **Memory & Context**: `names: ["memory"]` | 🔌 **Plugins & Market**: `names: ["market"]`',
+        '- 🎯 **Domain Skills**: `names: ["skills"]` | 🚀 **Full Unlock**: `names: ["*"]`',
       ].join('\n'),
   });
 
@@ -1005,6 +1086,10 @@ export function apply(ctx, config = {}) {
     const mcpResUnlocked = controller.isToolVisible(agent, 'list_mcp_resources');
     const opsDiscUnlocked = controller.isToolVisible(agent, 'ops_discover_tools');
     const imageUnlocked = controller.isToolVisible(agent, 'generate_image');
+    const taskBoardUnlocked = controller.isToolVisible(agent, 'task_board_list');
+    const sshUnlocked = controller.isToolVisible(agent, 'ssh_list');
+    const memoryUnlocked = controller.isToolVisible(agent, 'openviking_search') || controller.isToolVisible(agent, 'memory_store');
+    const computerUseUnlocked = controller.isToolVisible(agent, 'windows_computer_use_click') || controller.isToolVisible(agent, 'mcp__wincu__windows_computer_use_click');
 
     const fullVisible = viewHook.unfilteredView(agent).visible;
     const isMcpServerUnlocked = serverName => {
@@ -1022,6 +1107,10 @@ export function apply(ctx, config = {}) {
       if (sec.name === 'mcp-resource-servers' && !mcpResUnlocked) return false;
       if (sec.name.startsWith('dsh-ops:discovery-tools') && !opsDiscUnlocked) return false;
       if (sec.name.startsWith('dsh-image-gen:') && !imageUnlocked) return false;
+      if ((sec.name === 'plugin:task-board' || sec.name === 'plugin:task-board-github') && !taskBoardUnlocked) return false;
+      if (sec.name === 'plugin:dsh-ssh' && !sshUnlocked) return false;
+      if ((sec.name.startsWith('dsh-memory:') || sec.name.startsWith('openviking:')) && !memoryUnlocked) return false;
+      if ((sec.name.startsWith('dsh-computer-use:') || sec.name.startsWith('wincu:')) && !computerUseUnlocked) return false;
       if (sec.name.startsWith('mcp:')) {
         const serverName = sec.name.slice(4);
         if (!isMcpServerUnlocked(serverName)) return false;
@@ -1040,6 +1129,40 @@ export function apply(ctx, config = {}) {
     };
   });
 
+  // Strengthened pre-execute listener: intercept locked tool execution before dispatch with clear guidance
+  ctx.on('tools/pre-execute', async (exec, next) => {
+    const agent = exec?.agent;
+    if (!agent || !controller.ownsAgent(agent)) return next();
+    const toolName = exec?.name;
+    if (typeof toolName !== 'string') return next();
+
+    if (controller.isToolVisible(agent, toolName)) return next();
+
+    const fullVisible = viewHook.unfilteredView(agent).visible;
+    if (fullVisible.has(toolName)) {
+      if (config.autoUnlockOnDemand === true) {
+        const state = getAgentState(agent);
+        const allToolNames = new Set(fullVisible.keys());
+        const expanded = expandCompanionTools([toolName], allToolNames, policy.companionGroups);
+        for (const t of expanded) {
+          state.inFlight.add(t);
+          state.excluded.delete(t);
+        }
+        try { ctx.emit('tools/change'); } catch {}
+        return next();
+      }
+
+      const family = classifyTool(toolName, policy);
+      const alias = Object.entries(CATEGORY_ALIASES).find(([k, v]) => v === family)?.[0] || family;
+      const msg = `Diffusion Mode Guard: Tool "${toolName}" is installed in this harness (${family}) but is currently locked to preserve context budget.\n💡 Recommendation: Search capabilities with \`call_directory({ query: "${toolName}" })\`, or mount directly with \`call_directory({ names: [${JSON.stringify(toolName)}] })\` or category \`call_directory({ names: [${JSON.stringify(alias)}] })\`.`;
+      return {
+        kind: 'block',
+        feedback: [{ type: 'text', text: msg }],
+      };
+    }
+    return next();
+  });
+
   // Provide helpful guidance if the model calls a locked tool before unlocking it via call_directory
   ctx.on('tools/post-execute', async (exec, result, next) => {
     const decision = await next();
@@ -1053,7 +1176,7 @@ export function apply(ctx, config = {}) {
       !controller.isToolVisible(agent, toolName) &&
       viewHook.unfilteredView(agent).visible.has(toolName)
     ) {
-      const msg = `Error: Tool "${toolName}" exists in this harness but is currently locked in Diffusion Mode. Call \`call_directory({ names: [${JSON.stringify(toolName)}] })\` to unlock it immediately.`;
+      const msg = `Error: Tool "${toolName}" exists in this harness but is currently locked in Diffusion Mode. Recommendation: Search installed capabilities first via \`call_directory({ query: "${toolName}" })\` or call \`call_directory({ names: [${JSON.stringify(toolName)}] })\` to unlock it.`;
       return {
         kind: 'block',
         feedback: [{ type: 'text', text: msg }],

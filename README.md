@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://github.com/Cplay00/dsh-diffusion-preset/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-orange.svg" alt="dsh-plugin"></a>
-  <a href="https://github.com/Cplay00/dsh-diffusion-preset"><img src="https://img.shields.io/badge/version-1.1.0-emerald.svg" alt="Version"></a>
+  <a href="https://github.com/Cplay00/dsh-diffusion-preset"><img src="https://img.shields.io/badge/version-1.2.0-emerald.svg" alt="Version"></a>
 </p>
 
 [English](#english) | [中文说明](#中文说明)
@@ -27,8 +27,11 @@
 
 **扩散模式通过「调用目录 → 渐进展开 → 动态收敛」解决了这一困境：**
 - **初始极简**：回合起步时仅开放基础 Shell（Bash/PowerShell）、图片查看器及 `call_directory` 目录中枢，减少首轮工具 Schema 占用（实际节省随环境与配置变化）；
-- **按需解锁**：模型或用户通过 `call_directory` 随时检索并挂载所需领域的工具或技能，伴生工具自动联动（如解锁 `subagent` 自动附带 `send_message`、`list_agents`）；
-- **一步直达**：支持快捷分类别名（如 `names: ["fs", "task"]`）或 `names: ["*"]` 一键完整展开为全量标准模式；
+- **自适应动态发现**：根据当前 Harness 宿主内实际安装注册的所有可调用内容（内置核心工具、MCP 外部服务、已安装社区插件与领域技能）自适应聚类，无需外部硬编码；
+- **调用前建议先检索 (Search First)**：明确提醒与推荐模型在调用扩展工具前，优先使用 `call_directory({ query: "关键词" })` 检索确认当前环境中确切存在的工具或技能名称，避免盲目猜测；
+- **按需解锁与伴生联动**：模型或用户通过 `call_directory` 随时检索并挂载所需领域的工具或技能，伴生工具自动联动（如解锁 `subagent` 自动附带 `send_message`、`list_agents`）；
+- **一步直达**：支持丰富的分类别名（如 `names: ["fs", "task"]` 或 `names: ["文档", "浏览器"]`）或 `names: ["*"]` 一键完整展开为全量标准模式；
+- **安全门禁拦截**：强化 `tools/pre-execute` 监听门禁，若模型误调未解锁工具，自动拦截并提供智能搜索建议与一键挂载指令；
 - **动态收敛**：重型任务完成后，支持通过 `unload` 卸载特定工具或 `reset` 一键重置回极简状态，保持长程会话干爽。
 
 ---
@@ -36,14 +39,18 @@
 ### 🚀 核心特性
 
 - 🎯 **双预设支持**：同时提供 **扩散模式（标准版）** 与 **扩散模式（PTC 版）**，无缝适配 Native Function Call 与 Programmable Tool Calling。
+- 🔍 **智能搜索与关键词检索 (Search First)**：
+  - 调用未知扩展工具前，明确建议先使用 `call_directory({ query: "..." })` 进行检索；
+  - 智能支持中英文同义词（如搜索 `"文档"` 自动联想 `doc`/`docx`/`office`/`univer`/`file`，搜索 `"表格"` 联想 `excel`/`xlsx`/`sheet`，搜索 `"爬虫"` 联想 `crawl`/`tavily` 等）。
 - ⚡ **一步直达宏命令**：
   - `call_directory({ names: ["core:file", "core:task"] })` 或 `call_directory({ names: ["fs", "task"] })`：秒级挂载文件操作与任务跟踪。
   - `call_directory({ names: ["core:subagent"] })`：挂载子智能体与团队协作。
+  - `call_directory({ names: ["office"] })` 或 `call_directory({ names: ["文档"] })`：一键挂载办公套件工具链。
   - `call_directory({ names: ["*"] })`：完整展开为标准模式。
 - 🔄 **动态卸载收敛**：
   - `call_directory({ action: "unload", names: [...] })`：阶段性任务结束后精准卸载，收缩上下文。
   - `call_directory({ action: "reset" })`：重置会话回极简原点。
-- 📡 **按当前会话发现**：每次目录调用都读取当前作用域内的工具与技能，避免复用其他会话的目录。宿主可显式开启文档导出，仓库内的 `CATALOG.md` 保留为静态架构说明。
+- 📡 **按当前会话动态发现**：每次目录调用都读取当前作用域内实际注册的工具与技能，避免复用其他会话的目录。宿主可显式开启文档导出，仓库内的 `CATALOG.md` 保留为静态架构说明。
 
 ---
 
@@ -63,30 +70,38 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 
 | 动作 (`action`) | 说明 | 示例 |
 | :--- | :--- | :--- |
-| `catalog` | 查看全部分类总览与推荐快捷组合 | `call_directory({ action: "catalog" })` |
-| `lookup` | 只读检索候选，不挂载工具或加载技能正文 | `call_directory({ action: "lookup", category: "skills", query: "docx" })` |
+| `catalog` | 查看全部分类总览与推荐快捷组合（明确提醒建议先用 query 检索） | `call_directory({ action: "catalog" })` |
+| `lookup` | 只读关键词检索候选（推荐在调用前使用），不挂载工具或加载技能正文 | `call_directory({ query: "git" })` 或 `call_directory({ query: "文档" })` |
 | `detail` | 解锁并挂载指定工具/技能（传 `names` 默认执行） | `call_directory({ names: ["fs", "subagent"] })` |
 | `unload` | 动态卸载指定工具以收缩上下文 | `call_directory({ action: "unload", names: ["mcp:rea"] })` |
 | `reset` | 重置会话回初始极简状态 | `call_directory({ action: "reset" })` |
 
-#### 常用分类别名 (Aliases)
-- `fs` → `core:file`（文件读写、搜索与工作目录）
-- `task` → `core:task`（待办任务、目标与进度管理）
-- `subagent` → `core:subagent`（子智能体、并发工作流与团队编排）
-- `web` → `core:web`（网页搜索与正文提取）
-- `image` / `images` → `plugin:image-gen`（AI 生图、图片编辑与画布工作台）
-- `browser` → `plugin:browser`（会话内浏览器自动化控制）
-- `taskboard` / `board` → `plugin:task-board`（项目任务看板与 GitHub 集成）
+#### 常用分类别名 (Aliases，支持中英文)
+- `fs` / `file` / `文件` / `代码` → `core:file`（文件读写、搜索与工作目录）
+- `task` / `todo` / `任务` / `待办` / `计划` → `core:task`（待办任务、目标与进度管理）
+- `subagent` / `team` / `workflow` / `子智能体` / `团队` → `core:subagent`（子智能体、并发工作流与团队编排）
+- `web` / `search` / `网页` / `搜索` → `core:web`（网页搜索与正文提取）
+- `dev` / `terminal` / `git` / `终端` / `会话` → `core:dev`（终端命令行、会话追踪与 Git 工作树）
+- `office` / `univer` / `文档` / `表格` / `办公` → `plugin:univer`（Univer 办公套件与文档处理）
+- `browser` / `chrome` / `浏览器` → `plugin:browser`（会话内浏览器自动化控制）
+- `image` / `canvas` / `图片` / `生图` → `plugin:image-gen`（AI 生图、图片编辑与画布工作台）
+- `memory` / `remember` / `记忆` / `持久化` → `plugin:memory`（跨会话持久化记忆与知识图谱）
+- `market` / `plugin` / `市场` / `插件市场` → `plugin:market`（DSH 插件市场与管理器）
+- `ssh` / `remote` / `远程` / `服务器` → `plugin:ssh`（SSH 远程主机连接与集群操作）
+- `taskboard` / `board` / `看板` → `plugin:task-board`（项目任务看板与 GitHub 集成）
 - `ui` → `plugin:ui`（交互式 HTML/CSS 独立卡片呈现）
-- `tavily` → `mcp:tavily`（Tavily 智能搜索与深度爬虫）
-- `rea` → `mcp:rea`（二进制逆向工程与安全分析）
+- `tavily` / `crawl` / `爬虫` / `调研` → `mcp:tavily`（Tavily 智能搜索与深度爬虫）
+- `rea` / `reverse` / `逆向` / `反编译` → `mcp:rea`（二进制逆向工程与安全分析）
+- `design` / `opendesign` / `设计` / `原型` → `mcp:open-design`（OpenDesign 设计系统与原型）
 
 检索返回匹配的工具与技能候选（默认每页展示 20 个候选，支持 `limit` 与 `offset` 翻页）。结果优先展示准确名称，随后展示名称前缀及其他匹配，仅包含名称、分类和短摘要，不展开参数 Schema 或技能正文。检索不会改变工具可见性，即使同时传入 `names`，显式 `action: lookup` 也不会挂载。
 
 ```javascript
-call_directory({ query: "read" })                  // 查看匹配的候选
-call_directory({ query: "read", offset: 20 })      // 查看下一页
-call_directory({ names: ["read"] })                // 选择后仅挂载 read
+// 💡 强烈建议：调用扩展功能前先进行关键词检索
+call_directory({ query: "git" })                    // 搜索当前环境中与 git 相关的工具与技能
+call_directory({ query: "文档" })                   // 搜索文档、表格与办公套件工具
+call_directory({ query: "read", offset: 20 })       // 查看下一页
+call_directory({ names: ["read"] })                 // 确认后精准挂载 read
 ```
 
 `query` 为检索关键词，不会作为挂载目标。挂载支持分类别名（如 `names: ["fs"]`）、分类全名（如 `names: ["mcp:tavily"]`）、分类后缀（如 `names: ["tavily"]`、`names: ["vendor"]`）、通配符（如 `names: ["vendor_*"]`）或一键全量展开 `names: ["*"]`。
@@ -166,11 +181,13 @@ Traditional AI agent workflows inject full schemas for dozens of tools and volum
 ### 🌟 Key Highlights
 
 - **Lightweight First-Turn Context**: Reduces upfront tool schemas; actual token savings depend on the installed environment and configuration.
-- **One-Step Mounting**: Quickly mounts domain toolkits via aliases like `names: ["fs", "task"]` or expands completely via `names: ["*"]`.
-- **Efficient, Read-Only Lookup**: Search returns matching candidates with concise summaries (tools and skills shared). Page via `offset` and flexible `limit` without dumping heavy parameter schemas or skill bodies. Search keywords never become implicit mount targets.
+- **Dynamic Scoped Discovery**: Automatically inspects, categorizes, and organizes tools and skills actually installed in the current harness, without rigid external hardcoding.
+- **Search First (Recommended)**: Explicitly encourages calling `call_directory({ query: "<keyword>" })` before calling extended tools to discover exact names in the environment.
+- **One-Step Mounting**: Quickly mounts domain toolkits via aliases like `names: ["fs", "task"]`, Chinese aliases, or expands completely via `names: ["*"]`.
+- **Efficient, Read-Only Lookup**: Multilingual search with synonym expansion returns matching candidates with concise summaries. Lookup never dumps heavy parameter schemas or skill bodies.
+- **Execution Guard**: Pre-execution gate intercepts locked tool calls before dispatch, providing clear search guidance and direct mount code snippets.
 - **Dynamic Unloading**: Supports `action: "unload"` and `action: "reset"` to prune tokens during long-horizon sessions.
 - **Dual Preset Architectures**: Works out-of-the-box in both Native Function Calling and PTC (Programmable Tool Calling) environments.
-- **Scoped Discovery**: Reads the requesting session’s current tools and skills on every directory call. Host catalog file export is opt-in and protects existing user files.
 
 ---
 
