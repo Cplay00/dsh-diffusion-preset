@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-27T03:04:25.142Z",
+  "updatedAt": "2026-10-27T04:04:27.705Z",
   "presets": [
     {
       "id": "standard",
@@ -65,8 +65,8 @@
         "hasDocxSkillContent": false,
         "callableCountAfterSelective": 8,
         "callableToolsAfterSelective": [
-          "call_directory",
           "read",
+          "call_directory",
           "pwsh",
           "read_image",
           "send_message",
@@ -76,7 +76,7 @@
         ]
       },
       "fullUnlock": {
-        "callableCountAfterFullUnlock": 363
+        "callableCountAfterFullUnlock": 369
       }
     },
     "diffusion-ptc": {
@@ -111,8 +111,8 @@
         "hasDocxSkillContent": false,
         "callableCountAfterSelective": 8,
         "callableToolsAfterSelective": [
-          "call_directory",
           "read",
+          "call_directory",
           "pwsh",
           "read_image",
           "send_message",
@@ -122,7 +122,7 @@
         ]
       },
       "fullUnlock": {
-        "callableCountAfterFullUnlock": 362
+        "callableCountAfterFullUnlock": 368
       }
     }
   },
@@ -148,13 +148,18 @@
       "leakedServices": []
     },
     {
-      "id": "diffusion-ptc",
-      "moduleCount": 29,
+      "id": "diffusion",
+      "moduleCount": 30,
       "leakedServices": []
     },
     {
       "id": "diffusion",
       "moduleCount": 30,
+      "leakedServices": []
+    },
+    {
+      "id": "diffusion-ptc",
+      "moduleCount": 29,
       "leakedServices": []
     }
   ]

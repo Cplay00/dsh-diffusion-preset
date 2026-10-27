@@ -1,7 +1,7 @@
 {
-  "updatedAt": "2026-10-27T03:21:42.982Z",
-  "toolCount": 15,
-  "skillCount": 2,
+  "updatedAt": "2026-10-27T04:22:52.486Z",
+  "toolCount": 374,
+  "skillCount": 20,
   "categories": [
     {
       "id": "core:file",
@@ -10,36 +10,36 @@
       "summary": "读取、创建、精确编辑文本文件，按路径通配符 (glob) 或正则内容 (grep) 搜索代码，以及切换工作目录。",
       "tools": [
         {
-          "name": "read",
-          "description": "Read file"
-        },
-        {
-          "name": "write",
-          "description": "Write file"
-        },
-        {
-          "name": "edit",
-          "description": "Edit file"
-        },
-        {
-          "name": "glob",
-          "description": "Glob files"
-        },
-        {
-          "name": "grep",
-          "description": "Grep files"
-        },
-        {
           "name": "working_directory",
-          "description": "Change directory"
+          "description": "Read the current working directory, or change it with cd. Relative paths use the current directory. Existing shells and running processes keep their own direct…"
         },
         {
           "name": "ops_read_files",
-          "description": "Read files batch"
+          "description": "Read UTF-8 ranges relative to session cwd. Check each file complete/error; nextOffset continues lines, nextIndex resumes pending files. Binary needs a binary r…"
+        },
+        {
+          "name": "read",
+          "description": "Read a UTF-8 text file and return line-numbered content."
+        },
+        {
+          "name": "write",
+          "description": "Create or fully replace a UTF-8 text file."
+        },
+        {
+          "name": "edit",
+          "description": "Edit an existing UTF-8 text file by replacing literal text."
+        },
+        {
+          "name": "glob",
+          "description": "Find files, not directories, whose paths match a glob pattern, including hidden and ignored files. Returns up to 100 paths in modification-time order; a larger…"
+        },
+        {
+          "name": "grep",
+          "description": "Search file contents with a ripgrep regular expression. Returns matching lines with line numbers, grouped by file. Returns up to 250 matches; a larger result r…"
         },
         {
           "name": "ops_discover_tools",
-          "description": "Discover tools"
+          "description": "Select allowed OPS capabilities for the next model step in this scope; no file action."
         }
       ],
       "skills": []
@@ -51,24 +51,73 @@
       "summary": "派发独立或继承上下文的子智能体 (subagent / subagent_fork)、运行并发编排脚本 (workflow)、Ralph 迭代循环及多智能体团队协作。",
       "tools": [
         {
-          "name": "subagent",
-          "description": "Spawn subagent"
-        },
-        {
-          "name": "subagent_fork",
-          "description": "Fork subagent"
+          "name": "ralph",
+          "description": "Run a foreground fresh-agent Ralph loop toward one immutable objective. Use only when the direct human explicitly asks for Ralph or fresh-agent iteration. Each…"
         },
         {
           "name": "send_message",
-          "description": "Send message"
+          "description": "Send one message to another Team member. A running target receives it at the nearest step boundary; an inactive target starts or resumes a turn."
         },
         {
           "name": "interrupt_agent",
-          "description": "Interrupt agent"
+          "description": "Interrupt one teammate's current turn while preserving its pending inbox. Team Lead only."
         },
         {
           "name": "list_agents",
-          "description": "List agents"
+          "description": "List the Lead and every durable teammate with an addressable target and current availability. inactive means no turn is executing, not a task result. provision…"
+        },
+        {
+          "name": "workflow",
+          "description": "Run a JavaScript workflow script that orchestrates subagents at scale. Use this for work that fans out across many independent pieces — an audit over many file…"
+        },
+        {
+          "name": "subagent_fork",
+          "description": "Delegate a task to a subagent that inherits this conversation: a child agent seeded with all completed turns so far (it does not see the current in-flight turn…"
+        },
+        {
+          "name": "subagent",
+          "description": "Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped impleme…"
+        },
+        {
+          "name": "spawn_teammate",
+          "description": "Create one named, durable teammate. Only the Team Lead may call this tool."
+        },
+        {
+          "name": "wait_agent",
+          "description": "Wait for the next teammate status, message, or shared-task change after this call starts. This never wakes inactive members and returns noProgress immediately …"
+        },
+        {
+          "name": "team_task_create",
+          "description": "Create one unowned pending task on the shared Team task board."
+        },
+        {
+          "name": "team_task_list",
+          "description": "List shared tasks, including readiness, owner, revision, blockers, and write-scope warnings."
+        },
+        {
+          "name": "team_task_get",
+          "description": "Read the complete latest value of one shared task before changing or executing it."
+        },
+        {
+          "name": "team_task_update",
+          "description": "Compare-and-set a shared task action using the latest revision from team_task_get or team_task_list."
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "core:skill",
+      "kind": "core",
+      "title": "技能加载器与工作区依赖 (Skill Loader & Runtime Dependencies)",
+      "summary": "加载专业领域技能完整指令 (skill)，以及获取内置 Python/Node/pnpm 与 Office 依赖路径 (load_workspace_dependencies)。",
+      "tools": [
+        {
+          "name": "load_workspace_dependencies",
+          "description": "Get absolute paths to bundled Python and library directories, plus bundled Python distribution versions. Node.js and pnpm paths are included when the payload p…"
+        },
+        {
+          "name": "skill",
+          "description": "Load the full instructions for a skill. Call it before acting on a task that names or clearly matches a skill in the session skill catalog."
         }
       ],
       "skills": []
@@ -80,8 +129,146 @@
       "summary": "管理多步任务清单 (todo_write)、向用户提问确认 (ask_user_question)、提交规划审批 (exit_plan_mode)、长程目标 (goal) 与后台任务/定时提醒。",
       "tools": [
         {
+          "name": "job_output",
+          "description": "Read a background job: output since the previous read for stream jobs, or the result of a finished final-output job."
+        },
+        {
+          "name": "job_list",
+          "description": "List your background jobs (running and finished) with their ids, kinds, and statuses."
+        },
+        {
+          "name": "job_kill",
+          "description": "Request cancellation of a running background job."
+        },
+        {
           "name": "todo_write",
-          "description": "Update task list"
+          "description": "Record and update a task list to plan multi-step work and show progress; skip it for trivial single-step tasks. Add one todo per concrete step before you start…"
+        },
+        {
+          "name": "get_goal",
+          "description": "Read the current session goal, including the id and revision that update_goal requires."
+        },
+        {
+          "name": "create_goal",
+          "description": "Create a persisted goal that keeps this session working across automatic continuation rounds. Use it when the direct human request is a long-running objective,…"
+        },
+        {
+          "name": "update_goal",
+          "description": "Update the current goal."
+        },
+        {
+          "name": "ask_user_question",
+          "description": "Ask the user a concise question when you need confirmation, a choice, or missing information before proceeding."
+        },
+        {
+          "name": "exit_plan_mode",
+          "description": "Use only in plan mode. Present your plan for the user's review and, on approval, leave plan mode. The user may approve (carry out the plan from your next step)…"
+        },
+        {
+          "name": "schedule_create",
+          "description": "Create a reminder in the current session that delivers prompt when it becomes due. Supply exactly one timing parameter: after_seconds, at, every_seconds, daily…"
+        },
+        {
+          "name": "schedule_list",
+          "description": "List the active reminders in the current session."
+        },
+        {
+          "name": "schedule_delete",
+          "description": "Delete a reminder in the current session, active or inactive. Deletion does not retract a reminder message that is already queued."
+        },
+        {
+          "name": "schedule_update",
+          "description": "Change a reminder in place, keeping its id. Supply a new title, prompt, or at most one timing parameter; omitted fields keep their stored values. To change a r…"
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "core:web",
+      "kind": "core",
+      "title": "联网搜索、网页抓取与成果交付 (Web Search/Fetch & Present)",
+      "summary": "执行实时联网搜索 (web_search)、抓取指定 URL 网页内容 (web_fetch)，以及向用户展示最终交付文件卡片 (present)。",
+      "tools": [
+        {
+          "name": "web_search",
+          "description": "Search the web for current information. Returns an optional summary answer and a list of source URLs."
+        },
+        {
+          "name": "web_fetch",
+          "description": "Fetch the content of a specific HTTP(S) URL and return it decoded to text."
+        },
+        {
+          "name": "present",
+          "description": "Declare existing files as final deliverables for the user. Use it when the user needs a separate file, especially Office documents, spreadsheets, and slide dec…"
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "core:dev",
+      "kind": "core",
+      "title": "持久终端、历史会话检索、Worktree 与插件管理 (Terminal, Session, Worktree & Cordis)",
+      "summary": "操作持久化交互终端 (terminal_*)、检索历史会话事件 (session_*)、创建 Git Worktree，以及自省/管理 Cordis 插件与预设。",
+      "tools": [
+        {
+          "name": "terminal_open",
+          "description": "Create a persistent, owner-isolated terminal session from a registered backend type. Use this for shell or REPL state that must survive across tool calls."
+        },
+        {
+          "name": "terminal_send",
+          "description": "Send text to a persistent terminal. By default Enter is submitted and the call waits for a prompt, stdin wait, output silence, timeout, or session exit. Backgr…"
+        },
+        {
+          "name": "terminal_read",
+          "description": "Read a bounded page of retained output from a persistent terminal without sending input."
+        },
+        {
+          "name": "terminal_signal",
+          "description": "Send an allowed signal to the current foreground process group of a persistent terminal."
+        },
+        {
+          "name": "terminal_close",
+          "description": "Close one persistent terminal and wait until its captured owned process tree is gone."
+        },
+        {
+          "name": "terminal_list",
+          "description": "List persistent terminal sessions owned by the current agent."
+        },
+        {
+          "name": "create_worktree",
+          "description": "Create a new Git branch and worktree from a local commit, branch, or tag, then change this session's working directory to it. Defaults to HEAD and a generated …"
+        },
+        {
+          "name": "session_search",
+          "description": "Search prior sessions in the caller workspace and return the strongest matching event from each session."
+        },
+        {
+          "name": "session_event_search",
+          "description": "Search prior events in one authorized session; the current session excludes the step performing this call."
+        },
+        {
+          "name": "session_trace",
+          "description": "Read the authorized session lineage around one session, including complete visible ancestor and descendant relationships."
+        },
+        {
+          "name": "session_event_trace",
+          "description": "Read every direct replacement and relationship to a cited source event for one event in an authorized session."
+        },
+        {
+          "name": "session_event_read",
+          "description": "Read one full unabridged event and optional neighboring raw-event summaries from an authorized session."
+        },
+        {
+          "name": "cordis_inspect_list",
+          "description": "List every Cordis Inspect Provider currently known to the Host, including local Host Providers and the latest manifests synchronized from the Client. Each entr…"
+        },
+        {
+          "name": "cordis_inspect_query",
+          "description": "Run a read-only query declared by an Inspect Provider. platform, provider, and method must come from cordis_inspect_list, and input must satisfy that method's …"
+        },
+        {
+          "name": "plugin_manager",
+          "description": "List plugins or bundles in the current profile, enable or disable them, install a bundle, or remove an installed bundle. Every action requires danger-full-acce…"
         }
       ],
       "skills": []
@@ -94,14 +281,360 @@
       "tools": [],
       "skills": [
         {
-          "name": "docx",
-          "description": "Word document automation"
+          "name": "diagnose-windows-sandbox-acl",
+          "description": "Use on Windows for unexpected DSH sandbox access denials: workspace writes or listing fail, or an ordinarily readable path cannot be read. One bundled command …"
         },
         {
-          "name": "ppt-master",
-          "description": "Presentation generator"
+          "name": "dsh-ppt-fusion",
+          "description": "用 DSH-native 前端（pptwise）+ 原生 DrawingML 深度引擎（ppt-master）做融合 PPTX：相位 0 路由、主题、分镜、页级作者、四步深度门、渲染后处理与评审。"
+        },
+        {
+          "name": "office",
+          "description": "Create, edit, inspect, or convert Office documents, spreadsheets, presentations, and PDFs. Load to choose the relevant workflow."
+        },
+        {
+          "name": "office-docx",
+          "description": "Create, read, edit, and validate Word documents (.docx)."
+        },
+        {
+          "name": "office-export-pdf",
+          "description": "Convert an Office document to a requested PDF with LibreOffice Kit."
+        },
+        {
+          "name": "office-pptx",
+          "description": "Create, read, edit, and validate PowerPoint presentations (.pptx)."
+        },
+        {
+          "name": "office-recalculate",
+          "description": "Refresh spreadsheet formula caches and verify calculated values with LibreOffice Kit."
+        },
+        {
+          "name": "office-render",
+          "description": "Render requested document images or inspect visual layout with LibreOffice Kit."
+        },
+        {
+          "name": "office-xlsx",
+          "description": "Read, create, edit, and validate Excel workbooks, data, and formulas (.xlsx)."
+        },
+        {
+          "name": "openviking-memory",
+          "description": "Work with OpenViking, the persistent context database behind this agent's memory. Use it whenever the user refers to earlier sessions or shared history (\"like …"
+        },
+        {
+          "name": "openviking-skills",
+          "description": "Find, use, create, install, share, update, and migrate agent skills stored in OpenViking (viking://~/skills and viking://agent/skills). Use it when a search re…"
+        },
+        {
+          "name": "ov-experience-memory",
+          "description": "Retrieve and apply OpenViking Experience memories through the Agent runtime's generic OpenViking search and read tools. Use before or during executable, multi-…"
+        },
+        {
+          "name": "univer",
+          "description": "Create, inspect, edit, import, export, and hand off multi-Unit .univer files through DSH tools and isolated worktrees. Use proactively for any task involving .…"
+        },
+        {
+          "name": "univer-base",
+          "description": "Create, edit, calculate, inspect, export, and review Univer Base database Units through DSH tools and the Lite Interface. Use proactively for Base tables, fiel…"
+        },
+        {
+          "name": "univer-board",
+          "description": "Create, edit, chart, inspect, and review Univer Board canvas Units through DSH tools and the Lite Interface. Use proactively for Board shapes, text, connectors…"
+        },
+        {
+          "name": "univer-cross-unit-formula",
+          "description": "Author, calculate, update, inspect, and verify cross-Unit formulas through DSH tools and the Lite Interface. Use proactively when a Sheet cell or formula-drive…"
+        },
+        {
+          "name": "univer-doc",
+          "description": "Read, create, edit, paginate, chart, inspect, export, and review Univer Doc Units through DSH tools and the Lite Interface. Use proactively for paragraphs, ric…"
+        },
+        {
+          "name": "univer-embed",
+          "description": "Embed one Univer Unit inside another through DSH tools and the Lite Interface. Use proactively when a Sheet, Doc, Slide, Base, Board, dashboard, report, presen…"
+        },
+        {
+          "name": "univer-sheet",
+          "description": "Read, write, format, calculate, and verify Univer Sheet Units through DSH tools and the Lite Interface. Use proactively for spreadsheet values, formulas, range…"
+        },
+        {
+          "name": "univer-slide",
+          "description": "Create, redesign, edit, inspect, lint, export, and review Univer Slide Units through DSH tools and the Lite Interface. Use proactively for presentations, slide…"
         }
       ]
+    },
+    {
+      "id": "plugin:ppt-fusion",
+      "kind": "plugin",
+      "title": "DSH 融合 PPT 预览与评审 (dsh-ppt-flashmade)",
+      "summary": "在对话内直接预览融合 PPT 幻灯片 (dsh_ppt_preview)、生成草稿提案卡片 (dsh_ppt_propose) 及挂载渲染图进行视觉自检 (dsh_ppt_review)。",
+      "tools": [
+        {
+          "name": "dsh_ppt_preview",
+          "description": "Render a dsh-ppt-fusion deck and show it to the user as a slide preview inside this conversation. Accepts a fusion deck directory (deep pages are shown from th…"
+        },
+        {
+          "name": "dsh_ppt_propose",
+          "description": "Render this deck into an isolated draft version and show it as a review card (diff against the published trunk, page thumbnails, and the two commands a person …"
+        },
+        {
+          "name": "dsh_ppt_review",
+          "description": "Show this deck's rendered pages to yourself (image attachments) so you can review composition, density and narrative, then record the findings. Renders through…"
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "mcp:resources",
+      "kind": "mcp",
+      "title": "MCP 资源读取工具 (MCP Resources)",
+      "summary": "列出并读取各 MCP 服务端提供的 URI 资源与参数化资源模板。",
+      "tools": [
+        {
+          "name": "list_mcp_resources",
+          "description": "List resources available from an MCP server."
+        },
+        {
+          "name": "list_mcp_resource_templates",
+          "description": "List parameterized resource URI templates from an MCP server."
+        },
+        {
+          "name": "read_mcp_resource",
+          "description": "Read an MCP resource by URI from the named server. Use a listed URI or an expanded resource template."
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "plugin:univer",
+      "kind": "plugin",
+      "title": "Univer 办公文档与画板套件 (dsh-univer-office)",
+      "summary": "创建、检查、导入导出、编译 SVG 幻灯片、渲染截图、打印 PDF 及通过 Facade API 操作 .univer 表格/文档/幻灯片/多维表/画板。",
+      "tools": [
+        {
+          "name": "univer_new",
+          "description": "Create a new empty .univer file in the current workspace. This never overwrites an existing file and does not create an implicit Unit."
+        },
+        {
+          "name": "univer_status",
+          "description": "List trunk Units and worktrees for a .univer file, or inspect one worktree scope. Call this before choosing unitId or continuing prior work."
+        },
+        {
+          "name": "univer_worktree",
+          "description": "Create or transition an isolated Univer worktree. Actions: create, ready, reopen, merge, or discard. Merge and discard require user approval."
+        },
+        {
+          "name": "univer_unit",
+          "description": "Create or remove a top-level Sheet, Doc, Slide, Base, or Board Unit inside an explicit draft worktree. Use univer_status to list Units."
+        },
+        {
+          "name": "univer_import",
+          "description": "Import an xlsx, csv, tsv, docx, or pptx file as a new Unit inside an explicit draft worktree."
+        },
+        {
+          "name": "univer_inspect",
+          "description": "Inspect structured Univer content. Sheet accepts an optional range; Base and Board default to selector-free overviews; elementIds reads one or more Board eleme…"
+        },
+        {
+          "name": "univer_execute",
+          "description": "Execute Univer Facade JavaScript and commit mutations to a draft agent worktree. Use code only for a small snippet and codeFile for multiline or reusable code.…"
+        },
+        {
+          "name": "univer_export",
+          "description": "Export a .univer document or unit to a user-facing file format."
+        },
+        {
+          "name": "univer_lint",
+          "description": "Analyze Slide text layout for off-page content, escaped containers, and text overlap without producing screenshots."
+        },
+        {
+          "name": "univer_print_pdf",
+          "description": "Print one explicit Sheet, Doc, Slide, or Board Unit from trunk or a worktree to a workspace PDF file. Base Units are not printable."
+        },
+        {
+          "name": "univer_compile_svg",
+          "description": "Compile an SVG with real font metrics and apply it to one explicit Slide page in a draft worktree."
+        },
+        {
+          "name": "univer_api",
+          "description": "Look up the bundled, version-matched Univer Facade API. Use find when no relevant class or API label is known. Use show for a known class, type, or exact Class…"
+        },
+        {
+          "name": "univer_resources",
+          "description": "Discover, read, export, and cache bundled SVG resources. Use find before read or export; resource handles are stable within the bundled manifest."
+        },
+        {
+          "name": "univer_screenshot",
+          "description": "Render one explicit Sheet, Doc, Slide, Base, or Board Unit to PNG files and return the images for visual verification."
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "plugin:ssh",
+      "kind": "plugin",
+      "title": "SSH 远程主机与集群管理 (@linxin666/dsh-ssh)",
+      "summary": "列出已配置 SSH 主机、远程执行命令 (ssh_exec)、集群并发执行 (ssh_cluster)、上传下载文件与管理本地端口转发隧道。",
+      "tools": [
+        {
+          "name": "ssh_list",
+          "description": "List configured SSH hosts (alias, host, user, auth, agent forwarding, environment, tags, description). Use ssh_exec etc. with the alias."
+        },
+        {
+          "name": "ssh_exec",
+          "description": "Execute a shell command on a REMOTE SSH host by alias; the command runs on the remote host, never on this machine. For commands on this machine, use the local …"
+        },
+        {
+          "name": "ssh_upload",
+          "description": "Transfer a file FROM this machine (the dsh host) TO a remote SSH host. Use this only when the file must be copied to the remote host. Files that stay on this m…"
+        },
+        {
+          "name": "ssh_download",
+          "description": "Copy a remote FILE from a configured SSH host to this machine (the dsh host). Use this only when the source is on the remote host; files already on this machin…"
+        },
+        {
+          "name": "ssh_tunnel",
+          "description": "Manage local port-forward tunnels to a configured SSH host. Start a tunnel to reach a remote internal service (database, web UI, API) through 127.0.0.1 on this…"
+        },
+        {
+          "name": "ssh_cluster",
+          "description": "Run one command concurrently across selected SSH hosts; at least one aliases, environment, or tags filter is required."
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "mcp:wincu",
+      "kind": "mcp",
+      "title": "MCP 服务: wincu",
+      "summary": "Windows Computer Use & 浏览器自动化：优先通过浏览器通道操作网页标签页，或通过桌面 UIA/截图/OCR 控制本地 Windows 应用。",
+      "tools": [
+        {
+          "name": "mcp__wincu__windows_computer_use_health",
+          "description": "Check Windows backend availability."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_snapshot",
+          "description": "Screenshot and UIA tree. Partial trees report truncation; use OCR for sparse UIA. browserTab: page outline and viewport."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_accessibility_tree",
+          "description": "Read a bounded UIA tree; partial output does not establish absence. browserTab: page outline with element ids."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_list_windows",
+          "description": "List native top-level windows, HWND/PID and responsiveness; browserLane lists browser tabs for browserTab."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_find",
+          "description": "Find UIA controls; empty sparse searches add OCR. OCR hits use SCREEN coordinates, not element IDs."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_element_info",
+          "description": "Inspect a UIA element ID, page element ID or physical SCREEN point."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_click",
+          "description": "Click elementId (in the background) or physical SCREEN x/y (real click; the foreground and pointer go back). background delivery is unverified. Page ids (t1a2b…"
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_double_click",
+          "description": "Double-click elementId or physical SCREEN x/y; background delivery is unverified."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_move",
+          "description": "Move pointer to elementId or physical SCREEN x/y."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_drag",
+          "description": "Drag a path of physical SCREEN coordinates; the target comes forward for it."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_scroll",
+          "description": "Scroll elementId (in the background first) or physical SCREEN x/y; positive deltaY scrolls down."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_type_text",
+          "description": "Type into the focus. auto: Win32 edits in the background, else a paste with the window borrowed; restores the clipboard. background (WM_CHAR) is unverified."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_keypress",
+          "description": "Send key/chord, e.g. [\"ctrl\",\"a\"]. Windows key blocked; background supports one printable character only."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_focus",
+          "description": "Focus a UIA element."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_invoke",
+          "description": "Invoke/toggle/select/expand a UIA element in the background, with optional click fallback; action expands, collapses or scrolls it into view."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_set_value",
+          "description": "Set a value in the background, with optional focus/type fallback. Page ids fill fields; <tab>:address navigates; new-tab opens a URL in a background tab."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_activate_window",
+          "description": "Activate target window; activation cannot be suppressed."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_wait",
+          "description": "Pause briefly before observing again."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_ocr",
+          "description": "Read visible text without UIA. Literal query; inspect lines on misses. Click word.x/y in SCREEN coordinates."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_screenshot",
+          "description": "Capture without UIA. SCREEN = bounds origin + image pixel / imageScale. Inspect resulting state to verify actions. browserTab: page pixels."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_wait_for",
+          "description": "Wait for window/UIA element/literal OCR text. observed means condition met; partial UIA absence is inconclusive."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_close_window",
+          "description": "Post WM_CLOSE in background; application may close or show a save dialog."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_move_window",
+          "description": "Move window to physical SCREEN x/y; updates coordinate homing."
+        },
+        {
+          "name": "mcp__wincu__windows_computer_use_tools",
+          "description": "List capabilities; describe reads one full schema; enable/disable accepts names or [\"*\"] for all allowed desktop tools; reset restores startup selection."
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "mcp:tavily",
+      "kind": "mcp",
+      "title": "MCP 服务: tavily",
+      "summary": "Tavily AI 联网检索：面向 LLM 优化的实时网页搜索 (search)、正文提取 (extract)、全站爬取 (crawl/map) 与深度调研 (research)。",
+      "tools": [
+        {
+          "name": "mcp__tavily__tavily_search",
+          "description": "Search the web for current information on any topic. Use for news, facts, or data beyond your knowledge cutoff. Returns snippets and source URLs."
+        },
+        {
+          "name": "mcp__tavily__tavily_extract",
+          "description": "Extract content from URLs. Returns raw page content in markdown or text format."
+        },
+        {
+          "name": "mcp__tavily__tavily_crawl",
+          "description": "Crawl a website starting from a URL. Extracts content from pages with configurable depth and breadth."
+        },
+        {
+          "name": "mcp__tavily__tavily_map",
+          "description": "Map a website's structure. Returns a list of URLs found starting from the base URL."
+        },
+        {
+          "name": "mcp__tavily__tavily_research",
+          "description": "Perform comprehensive research on a given topic or question. Use this tool when you need to gather information from multiple sources to answer a question or co…"
+        }
+      ],
+      "skills": []
     },
     {
       "id": "mcp:rea",
@@ -110,8 +643,1082 @@
       "summary": "Reverse Engineer Anything (REA) 逆向工程：二进制 (ELF/PE/Mach-O/APK/WASM/固件)、JS 包与浏览器运行时的静态/动态分析。",
       "tools": [
         {
-          "name": "mcp__rea__disasm",
-          "description": "REA disassembler"
+          "name": "mcp__rea__annotate_native_function",
+          "description": "Atomically update one function name and/or entry comments, read them back, and return a refreshed complete function dossier. Ghidra changes its ephemeral sessi…"
+        },
+        {
+          "name": "mcp__rea__inspect_native_load_image",
+          "description": "Verify the provider's loaded DOS MZ or explicitly selected COM image against its immutable target snapshot: complete original/modified source-byte digests, hea…"
+        },
+        {
+          "name": "mcp__rea__inspect_native_data_type",
+          "description": "Inspect one recovered type by exact database category path or defined typed data address. Returns observed size, alignment, packing, fields, bitfields, enum va…"
+        },
+        {
+          "name": "mcp__rea__inspect_native_instruction",
+          "description": "Inspect one exact code or data address: decoded bytes, mnemonic, ordered operand tokens, flow, outgoing instruction references and typed incoming references wh…"
+        },
+        {
+          "name": "mcp__rea__resolve_native_call_targets",
+          "description": "Resolve one explicit static call site using typed provider call references. Preserves ambiguous targets as candidates and unresolved computed calls as unknown;…"
+        },
+        {
+          "name": "mcp__rea__address_name",
+          "description": "Resolve the primary analyzed name at a code or data address. Headless providers require an explicit address; GUI providers may default to their current cursor.…"
+        },
+        {
+          "name": "mcp__rea__comment",
+          "description": "Read the regular analysis comment at an address, defaulting to the current cursor. This is read-only and returns null when no comment exists; use set_comment t…"
+        },
+        {
+          "name": "mcp__rea__current_address",
+          "description": "Return Hopper's current cursor address for the selected document. Use only for interactive navigation state; prefer explicit addresses in reproducible investig…"
+        },
+        {
+          "name": "mcp__rea__current_procedure",
+          "description": "Return the analyzed procedure containing Hopper's current cursor. This uses GUI cursor state and is not a procedure-name lookup."
+        },
+        {
+          "name": "mcp__rea__current_document",
+          "description": "Return the document currently selected by REA's Hopper bridge."
+        },
+        {
+          "name": "mcp__rea__goto_address",
+          "description": "Move Hopper's GUI cursor to a mapped address and return the observed cursor address. Interior coordinates snap to the containing analyzed object's start. Unmap…"
+        },
+        {
+          "name": "mcp__rea__inline_comment",
+          "description": "Read the inline instruction comment at an address, defaulting to the current cursor. Returns null when absent; use set_inline_comment to write one."
+        },
+        {
+          "name": "mcp__rea__list_bookmarks",
+          "description": "List every bookmark in the selected Hopper document as address and name pairs; unnamed bookmarks retain a null name. Use bookmarks as analyst-authored navigati…"
+        },
+        {
+          "name": "mcp__rea__list_documents",
+          "description": "List provider program or document identities. Hopper may expose several documents; a Ghidra headless session contains exactly its one imported Program."
+        },
+        {
+          "name": "mcp__rea__list_names",
+          "description": "List every analyzed memory and external symbol as address/value pairs. Provider metadata distinguishes Ghidra primary, dynamic, external, type, and source fact…"
+        },
+        {
+          "name": "mcp__rea__list_procedures",
+          "description": "List every analyzed procedure as address/value pairs after provider analysis. Ghidra metadata distinguishes thunks and external functions; use returned address…"
+        },
+        {
+          "name": "mcp__rea__list_segments",
+          "description": "List segments or memory blocks using exclusive end addresses. Ghidra reports block permissions, address space, image base, initialization, and overlay facts; H…"
+        },
+        {
+          "name": "mcp__rea__list_strings",
+          "description": "List every provider-defined string object, or filter to one address, as address/value pairs with encoding, terminator status, and byte length when available. H…"
+        },
+        {
+          "name": "mcp__rea__next_address",
+          "description": "Return the next analyzed object address after an explicit address or current cursor. This is a navigation primitive, not instruction-flow or CFG analysis."
+        },
+        {
+          "name": "mcp__rea__prev_address",
+          "description": "Return the previous analyzed object start before an explicit address or current cursor. This is a navigation primitive and may fail at document boundaries; dat…"
+        },
+        {
+          "name": "mcp__rea__procedure_address",
+          "description": "Resolve an unambiguous procedure symbol name or provider-normalized address to its canonical entry address. External address spaces remain explicit."
+        },
+        {
+          "name": "mcp__rea__procedure_assembly",
+          "description": "Return assembly for one analyzed procedure identified by symbol or hexadecimal address. Use when pseudocode loses calling-convention or instruction-level detai…"
+        },
+        {
+          "name": "mcp__rea__procedure_callees",
+          "description": "Return the provider's resolved direct callees for one procedure identified by symbol or address. Unresolved indirect calls may be absent; use analyze_function …"
+        },
+        {
+          "name": "mcp__rea__procedure_callers",
+          "description": "Return the provider's resolved direct callers for one procedure identified by symbol or address. Results reflect completed static analysis and may omit unresol…"
+        },
+        {
+          "name": "mcp__rea__procedure_info",
+          "description": "Return provider metadata for one procedure identified by symbol or address: entrypoint, signature, locals, size, block count, and complete inclusive body range…"
+        },
+        {
+          "name": "mcp__rea__read_function_instructions",
+          "description": "Return every raw instruction for one analyzed procedure. Instruction text and body extent are provider-specific. Ghidra terminal-call assumptions that may cut …"
+        },
+        {
+          "name": "mcp__rea__search_bytes",
+          "description": "Find masked byte signatures in initialized analyzed memory. Hex byte pairs and ?? wildcards are supported; an optional equal-length hex mask selects bits. Boun…"
+        },
+        {
+          "name": "mcp__rea__read_bytes",
+          "description": "Read analyzed bytes from one provider-normalized virtual address. The hexadecimal payload reports the exact returned length; incomplete reads remain explicit a…"
+        },
+        {
+          "name": "mcp__rea__address_to_file_offset",
+          "description": "Map one provider-normalized virtual address to its original nonnegative file offset. Hopper verifies the original bytes against the selected executable digest …"
+        },
+        {
+          "name": "mcp__rea__procedure_references",
+          "description": "Return every raw incoming or outgoing reference edge for one procedure. Endpoint procedures are resolved only from provider containment. Ghidra preserves detai…"
+        },
+        {
+          "name": "mcp__rea__procedure_pseudo_code",
+          "description": "Decompile one analyzed procedure by symbol name or provider-normalized address. Ghidra also accepts file-offset:0x... selectors and falls back to a unique sour…"
+        },
+        {
+          "name": "mcp__rea__resolve_containing_procedure",
+          "description": "Resolve an arbitrary address, including an interior instruction or exact external entry, to its provider-analyzed containing procedure. A negative result disti…"
+        },
+        {
+          "name": "mcp__rea__search_procedures",
+          "description": "Search every analyzed procedure name using literal matching by default or regex when requested. Results are deterministic and complete. Hopper regex mode uses …"
+        },
+        {
+          "name": "mcp__rea__search_strings",
+          "description": "Search every provider-defined string object using literal matching by default or regex when requested. Results are deterministic and complete over those define…"
+        },
+        {
+          "name": "mcp__rea__set_address_name",
+          "description": "Assign an analyst name to one mapped hexadecimal address and report whether the native edit succeeded and exact readback matched. Hopper rejects symbol names e…"
+        },
+        {
+          "name": "mcp__rea__set_addresses_names",
+          "description": "Assign analyst names to multiple mapped addresses in one call and return per-address edit/readback success booleans. Hopper validates mapped destinations, nati…"
+        },
+        {
+          "name": "mcp__rea__set_bookmark",
+          "description": "Create or replace a bookmark at a mapped hexadecimal address and report success. This mutates navigation metadata; bookmarks are analyst-authored navigation ai…"
+        },
+        {
+          "name": "mcp__rea__set_comment",
+          "description": "Write a regular analysis comment at a hexadecimal address and return whether readback matched. An empty comment clears it. This mutates the Hopper document; us…"
+        },
+        {
+          "name": "mcp__rea__set_inline_comment",
+          "description": "Write an inline instruction comment at a hexadecimal address and return whether readback matched. An empty comment clears it; Hopper may flatten newlines, prod…"
+        },
+        {
+          "name": "mcp__rea__unset_bookmark",
+          "description": "Remove the bookmark at a mapped hexadecimal address and return whether it is absent. Hopper also permits removing an existing legacy bookmark outside mapped me…"
+        },
+        {
+          "name": "mcp__rea__xrefs",
+          "description": "Return analyzed references to a code or data address. Hopper may default to its current cursor; headless providers such as Ghidra require an explicit address. …"
+        },
+        {
+          "name": "mcp__rea__trace_native_values",
+          "description": "Trace a bounded static dependency graph from one explicit native procedure. Includes high-p-code def-use, constants, operators, memory and branch operations, r…"
+        },
+        {
+          "name": "mcp__rea__inspect_native_dispatch_metadata",
+          "description": "Inspect the bound provider's name inventory for Objective-C class/method symbols and Swift mangled symbols, returning at most max_records decoded names. Includ…"
+        },
+        {
+          "name": "mcp__rea__get_objc_classes",
+          "description": "Discover and deduplicate Objective-C class labels, optionally filtering by literal substring."
+        },
+        {
+          "name": "mcp__rea__get_objc_protocols",
+          "description": "Discover and deduplicate Objective-C and Swift protocol labels."
+        },
+        {
+          "name": "mcp__rea__batch_decompile",
+          "description": "Decompile each explicit procedure symbol or address concurrently. Preserves each input selector in address and reports the observed canonical entry and entry l…"
+        },
+        {
+          "name": "mcp__rea__get_call_graph",
+          "description": "Resolve one symbol or address to its canonical procedure entry, then traverse the bound provider's caller or callee relationships until the reachable graph is …"
+        },
+        {
+          "name": "mcp__rea__analyze_swift_types",
+          "description": "Categorize analyzed Swift procedure names using their manglings or same-address Swift symbol aliases. Decodes legacy and literal modern nominal contexts into c…"
+        },
+        {
+          "name": "mcp__rea__find_xrefs_to_name",
+          "description": "Resolve an exact name against the bound provider's name inventory and return a resolved or unresolved result. Unresolved names use the stable name_not_found re…"
+        },
+        {
+          "name": "mcp__rea__binary_overview",
+          "description": "Return the bound document and exhaustive procedure/string counts, plus every segment and segment_count when the provider supports segment enumeration. If segme…"
+        },
+        {
+          "name": "mcp__rea__analyze_function",
+          "description": "Build a dossier for one native function identified by symbol or provider-returned address. Returns identity with complete inclusive analyzed body ranges or exp…"
+        },
+        {
+          "name": "mcp__rea__inspect_native_api",
+          "description": "Analyze a native API boundary in one function identified by symbol or provider-returned address. Returns confidence, evidence, jump-table dispatch/data/case ma…"
+        },
+        {
+          "name": "mcp__rea__trace_feature",
+          "description": "Trace the complete literal query, preserving spaces, through every matching string and procedure, their xrefs, and truthful containing-procedure resolution. Re…"
+        },
+        {
+          "name": "mcp__rea__trace_call_path",
+          "description": "Resolve start and optional goal symbols or addresses to canonical procedure entries, then trace direct callers or callees until the graph is exhausted or the g…"
+        },
+        {
+          "name": "mcp__rea__trace_native_ui_action",
+          "description": "Trace one unique compiled UI action, object ID, native symbol or exact function address through authored connections, encoded or symbolized Objective-C handler…"
+        },
+        {
+          "name": "mcp__rea__observe_native_ui",
+          "description": "Observe an already-running native app by PID and window ID, bound to the active Mach-O target. Captures a bounded accessibility tree and selected-window screen…"
+        },
+        {
+          "name": "mcp__rea__capture_native_ui_scenario",
+          "description": "Run selected-element press, increment/decrement scroll, AXValue text entry and bounded wait steps in one exact native app window. Returns ordered before/after …"
+        },
+        {
+          "name": "mcp__rea__observe_native_calls",
+          "description": "Launch the active Mach-O as an owned process under LLDB and record each entry into caller-selected functions or Objective-C methods: thread, module, symbol, lo…"
+        },
+        {
+          "name": "mcp__rea__inspect_macho",
+          "description": "Inspect Mach-O slices, load commands, imports, exports, dependencies, build metadata, segments, sections, permissions, and exact command provenance without lau…"
+        },
+        {
+          "name": "mcp__rea__inspect_signature",
+          "description": "Inspect the active Mach-O executable's code-signing identity, hashes, authorities, requirements, entitlements, hardened-runtime state, and exact command proven…"
+        },
+        {
+          "name": "mcp__rea__inspect_plist",
+          "description": "Parse Info.plist from the active artifact by default, or pass any local plist path. Returns normalized JSON rather than plutil text."
+        },
+        {
+          "name": "mcp__rea__list_architectures",
+          "description": "List thin or universal Mach-O slices with offsets, sizes, alignment, explicit coverage, and native-tool provenance."
+        },
+        {
+          "name": "mcp__rea__demangle_swift",
+          "description": "Demangle an ordered list of single-line Swift symbols without requiring Hopper. Each input returns demangled, unchanged, or invalid status."
+        },
+        {
+          "name": "mcp__rea__inspect_artifact",
+          "description": "Inspect an active archive or application package in one call. By default returns the complete content-addressed artifact graph once, as the typed nested invent…"
+        },
+        {
+          "name": "mcp__rea__extract_artifact",
+          "description": "Extract all regular files from the active archive or application package into a fresh temporary directory chosen by REA. The result includes its location. Reje…"
+        },
+        {
+          "name": "mcp__rea__decode_interface_builder",
+          "description": "Decode compiled storyboard and nib archives inside the active Apple app bundle, including keyed property lists and NIBArchive object tables, into a bounded obj…"
+        },
+        {
+          "name": "mcp__rea__inspect_keyed_archive",
+          "description": "Inspect one Foundation NSKeyedArchiver plist in the active app bundle as original object-table nodes, class descriptors, named roots, and UID edges. Preserves …"
+        },
+        {
+          "name": "mcp__rea__inspect_asset_catalog",
+          "description": "Inspect compiled Assets.car metadata in an active Apple app bundle. Returns stable paginated catalog and rendition records with raw assetutil metadata and cata…"
+        },
+        {
+          "name": "mcp__rea__trace_dylib_resolution",
+          "description": "Trace how dyld would resolve each Mach-O dylib load for the active Mach-O, or for every executable in the active .app bundle (the main app, XPC services, exten…"
+        },
+        {
+          "name": "mcp__rea__inspect_managed_artifact",
+          "description": "Inspect an explicit PE/CLI path, or the selected managed target, without loading or executing target code. Omitted or complete detail returns complete metadata…"
+        },
+        {
+          "name": "mcp__rea__inspect_managed_members",
+          "description": "Inspect PE/CLI metadata members, signatures, raw CIL hashes, decoded-instruction-tuple hashes, separately reported exception regions, call edges, field-access …"
+        },
+        {
+          "name": "mcp__rea__inspect_managed_native_boundaries",
+          "description": "Inspect PE/CLI ModuleRef, ImplMap/PInvoke declarations, CLI native-header indicators, and non-IL method implementation flags without loading or executing targe…"
+        },
+        {
+          "name": "mcp__rea__compare_managed_members",
+          "description": "Compare two authenticated inspect_managed_members Evidence records using unique-only tiers: exact declared type, name, and CIL/signature; exact declared type, …"
+        },
+        {
+          "name": "mcp__rea__verify_managed_native_boundaries",
+          "description": "Verify managed P/Invoke/native-boundary declarations against authenticated native export or function Evidence without executing managed code or translating man…"
+        },
+        {
+          "name": "mcp__rea__import_managed_reconstruction",
+          "description": "Import decompiler-produced managed reconstruction against authenticated inspect_managed_members Evidence. The workflow locks each method to artifact SHA-256, M…"
+        },
+        {
+          "name": "mcp__rea__project_managed_application_graph",
+          "description": "Project authenticated managed artifact, member, and native-boundary Evidence into the provider-neutral application graph without executing managed code, loadin…"
+        },
+        {
+          "name": "mcp__rea__inspect_with_objdump",
+          "description": "Run caller-selected GNU objdump inspection against a local artifact, or request operation=architectures without a path to list BFD targets advertised by the in…"
+        },
+        {
+          "name": "mcp__rea__execute_rizin_command",
+          "description": "Execute one caller-selected Rizin command against a local artifact using the Rizin CLI profile that suppresses user settings and scripts while retaining plugin…"
+        },
+        {
+          "name": "mcp__rea__list_frida_devices",
+          "description": "List Frida devices currently available to this host, optionally connecting to the caller-selected remote Frida endpoint. Remote authentication options are used…"
+        },
+        {
+          "name": "mcp__rea__list_frida_processes",
+          "description": "List processes observed on a selected Frida device or caller-supplied remote endpoint. A remote connection is closed after discovery; authentication values are…"
+        },
+        {
+          "name": "mcp__rea__start_frida_session",
+          "description": "Attach Frida to one selected process or spawn one selected target. Spawned targets remain paused until resume_frida_session, allowing scripts to load before ex…"
+        },
+        {
+          "name": "mcp__rea__load_frida_script",
+          "description": "Load caller-supplied JavaScript into a Frida session. Scripts can read or change target memory and behavior and can access the target process's capabilities. M…"
+        },
+        {
+          "name": "mcp__rea__resume_frida_session",
+          "description": "Resume the process created by a paused Frida spawn session. Attached processes are already running and cannot be resumed through this operation."
+        },
+        {
+          "name": "mcp__rea__unload_frida_script",
+          "description": "Unload one caller-selected Frida script from a live session. This removes that script's instrumentation from the target."
+        },
+        {
+          "name": "mcp__rea__frida_session_status",
+          "description": "Return observed Frida session state and queued script messages. Message history is bounded by the provider capture budget and reports truncation."
+        },
+        {
+          "name": "mcp__rea__close_frida_session",
+          "description": "Unload session scripts and detach REA's Frida session. If a spawned process is still paused, resume it before detaching so it is not left suspended. REA never …"
+        },
+        {
+          "name": "mcp__rea__instrument_with_frida",
+          "description": "Run one caller-authored Frida script against an explicitly selected process and detach when the observation window ends. The CLI and MCP share this ephemeral w…"
+        },
+        {
+          "name": "mcp__rea__list_cutter_sessions",
+          "description": "List live REA bridge sessions hosted by upstream Cutter instances, including observed document identity and bridge-directory security status. Discovery admits …"
+        },
+        {
+          "name": "mcp__rea__cutter_command",
+          "description": "Run one arbitrary Rizin command in a selected live Cutter session. Commands may edit and persist analysis state or execute plugin-provided effects; completion …"
+        },
+        {
+          "name": "mcp__rea__start_gdb_session",
+          "description": "Start a BYO GDB process in MI3 mode when available, suppress startup files, and disable auto-loading. Persistent GDB sessions are available only on Linux, wher…"
+        },
+        {
+          "name": "mcp__rea__gdb_console",
+          "description": "Run one unrestricted GDB CLI command through MI interpreter-exec console and return raw MI, console, target, and log records inline with Evidence. A command ti…"
+        },
+        {
+          "name": "mcp__rea__gdb_session_status",
+          "description": "Return the observed lifecycle state and bounded recent MI records and process diagnostics for one persistent REA GDB session; truncation and invalid-UTF-8 fiel…"
+        },
+        {
+          "name": "mcp__rea__close_gdb_session",
+          "description": "Close the owned GDB process after verifying the inferior state. When one live thread group has a verified durable output TTY, REA automatically detaches it, wh…"
+        },
+        {
+          "name": "mcp__rea__start_rizin_debug_session",
+          "description": "Start a persistent Rizin debugger session using `-N` to suppress user settings and scripts while retaining plugins, `-0` for NUL framing, and `-d` with an opti…"
+        },
+        {
+          "name": "mcp__rea__rizin_debug_command",
+          "description": "Execute one unrestricted command in a persistent Rizin debugger session. Returns raw output inline with Evidence, including backend output interleaved before t…"
+        },
+        {
+          "name": "mcp__rea__rizin_debug_session_status",
+          "description": "Return observed lifecycle state and bounded recent NUL-framed output and process diagnostics for one Rizin debugger session; truncation fields report discarded…"
+        },
+        {
+          "name": "mcp__rea__close_rizin_debug_session",
+          "description": "Close the REA-owned Rizin debugger only after verifying no inferior remains or detaching one with a verified caller-selected TTY output sink. A detached target…"
+        },
+        {
+          "name": "mcp__rea__inspect_packet_capture",
+          "description": "Inspect caller-selected fields in an existing local packet capture with TShark 4.x. Return 50 matching frames by default, with match_offset/match_limit paging …"
+        },
+        {
+          "name": "mcp__rea__inspect_packet_fields",
+          "description": "Discover protocols or field names/types registered in the installed TShark 4.x. kind defaults to protocols; use fields and optional exact protocol abbreviation…"
+        },
+        {
+          "name": "mcp__rea__decode_signal_recording",
+          "description": "Decode an existing local logic/signal recording on Linux with sigrok-cli 0.7.2 and util-linux prlimit. Supply decoder stack, channels and options explicitly; o…"
+        },
+        {
+          "name": "mcp__rea__inspect_signal_decoders",
+          "description": "Discover installed sigrok protocol decoders or inspect one decoder's channel/option help on Linux. Omit decoder to list ID/name pairs; supply its exact ID for …"
+        },
+        {
+          "name": "mcp__rea__inspect_android_package",
+          "description": "Inspect a local APK's package, SDK and permission declarations, decoded manifest and class/resource counts. Omitted or complete detail preserves the complete r…"
+        },
+        {
+          "name": "mcp__rea__search_android_classes",
+          "description": "Search complete decompiler class-name rows in an explicit local APK by case-sensitive substring. Empty query inventories all rows. Repeated names remain repeat…"
+        },
+        {
+          "name": "mcp__rea__inspect_android_class",
+          "description": "Inspect one exact Android class's parsed methods, fields and inner classes, including synthetic members. Returns display signatures and exact DEX prototypes wi…"
+        },
+        {
+          "name": "mcp__rea__inspect_android_method",
+          "description": "Decompile one Android method with smali fallback. Requires explicit overload_index when multiple methods share a name. Reports its DEX prototype, representatio…"
+        },
+        {
+          "name": "mcp__rea__trace_android_references",
+          "description": "Trace incoming static using nodes to an exact Android class or selected method overload. The total counts containing nodes, not individual invoke instructions.…"
+        },
+        {
+          "name": "mcp__rea__inspect_jeb_client",
+          "description": "Inspect the running JEB client serving MCP: engine version, GUI or headless mode, and startup time. Does not open a target. Requires a caller-started JEB clien…"
+        },
+        {
+          "name": "mcp__rea__open_jeb_project",
+          "description": "Open or create a JEB project from an artifact file or existing .jdb2 database on the engine host. Returns the project's input-file digests and top-level units.…"
+        },
+        {
+          "name": "mcp__rea__list_jeb_units",
+          "description": "List project units by stable unit path and type, with optional wildcard filter, parent restriction, and pagination. The engine caps pages at 100 units; a full …"
+        },
+        {
+          "name": "mcp__rea__decompile_jeb_item",
+          "description": "Decompile one type or method to engine pseudo-code using its decompiler (Dalvik, Java, or native). item_address comes from the engine's code item listing; unit…"
+        },
+        {
+          "name": "mcp__rea__inspect_binary_layout",
+          "description": "Inspect an explicit local binary without launching it as a host process. Returns file-backed section/segment ranges, linked addresses, original symbol/REL/RELA…"
+        },
+        {
+          "name": "mcp__rea__inspect_analysis_view",
+          "description": "Inspect selected views of completed binary-layout, JavaScript application, native analyze_function, inspect_artifact, inventory_artifact, inspect_wasm_artifact…"
+        },
+        {
+          "name": "mcp__rea__inspect_pe_resources",
+          "description": "Inspect one explicit local PE32/PE32+ image's complete bounded type/name/language resource tree without executing it or opening a disassembler. Returns numeric…"
+        },
+        {
+          "name": "mcp__rea__inspect_go_binary",
+          "description": "Inspect embedded Go compiler version, main module, dependency/replacement versions and build settings in an explicit local ELF, PE or thin Mach-O image. Return…"
+        },
+        {
+          "name": "mcp__rea__inspect_rust_binary",
+          "description": "Inspect the cargo-auditable crate dependency list embedded in an explicit local ELF, PE or thin Mach-O image. Returns the artifact SHA-256, the .dep-v0 section…"
+        },
+        {
+          "name": "mcp__rea__compare_wasm_interfaces",
+          "description": "Compare typed core WASM import/export names, kinds and exact signatures from two authenticated inspect_wasm_artifact Evidence records. Select imports, exports …"
+        },
+        {
+          "name": "mcp__rea__inspect_wasm_artifact",
+          "description": "Validate an explicit local WASM artifact with caller-supplied WABT 1.0.42. Omitted or complete detail returns exact byte SHA-256, sections, upstream import/exp…"
+        },
+        {
+          "name": "mcp__rea__inspect_evm_interface",
+          "description": "Inspect explicit local flat EVM bytecode without target execution or chain/RPC access. Select raw or hex encoding explicitly. Omitted or complete detail return…"
+        },
+        {
+          "name": "mcp__rea__inspect_sqlite_database",
+          "description": "Inspect an explicit local SQLite database snapshot and its existing sibling WAL without modifying source files or opening a native analysis provider. Requires …"
+        },
+        {
+          "name": "mcp__rea__inspect_recorded_crash",
+          "description": "Inspect a supplied Linux ELF64 amd64 or AArch64 little-endian core without launching its target or attaching to any live PID. Returns all recorded segments, ra…"
+        },
+        {
+          "name": "mcp__rea__inspect_firmware_regions",
+          "description": "Inspect signature candidates in a local firmware file with Binwalk 3.1.x (verified with 3.1.0). Returns offsets, reported lengths, descriptions and raw confide…"
+        },
+        {
+          "name": "mcp__rea__extract_firmware",
+          "description": "Extract caller-selected firmware bytes with Unblob 26.6.x (verified with 26.6.4) into an absent output directory. Returns verified child paths/digests, task de…"
+        },
+        {
+          "name": "mcp__rea__trace_web_module_imports",
+          "description": "Trace one exported website script's outgoing native ES imports/re-exports, using exact URL and optional selected import-map context. Reads a local export_web_s…"
+        },
+        {
+          "name": "mcp__rea__trace_web_source_location",
+          "description": "Trace one generated position in an exported website script through an explicitly paired local source map. Verifies manifest, selected script and map SHA-256/by…"
+        },
+        {
+          "name": "mcp__rea__observe_web_execution",
+          "description": "Instrument one selected CDP page for a finite, externally driven precise coverage window. Resets execution counters and prevents optimized execution until stop…"
+        },
+        {
+          "name": "mcp__rea__inspect_web_event_listeners",
+          "description": "Inspect listeners registered directly on the first main-document CSS match in one selected CDP page. Returns event flags, native callback locations, source own…"
+        },
+        {
+          "name": "mcp__rea__inspect_web_network_capture",
+          "description": "Request detail summary for capture identity and counts; then page retained records with inspect_analysis_view kind capture (preview or complete), avoiding repe…"
+        },
+        {
+          "name": "mcp__rea__recover_javascript_sources",
+          "description": "Recover readable modules from local UTF-8 JavaScript scripts/bundles into an absent directory, using caller-supplied Wakaru ^1.13.0 (verified with 1.14.0) on L…"
+        },
+        {
+          "name": "mcp__rea__inspect_adb_client",
+          "description": "Inspect the caller-selected adb client: resolved binary, version, and install path. Never contacts devices and never starts the adb server. REA never installs …"
+        },
+        {
+          "name": "mcp__rea__list_adb_devices",
+          "description": "List attached devices exactly as `adb devices -l` reports them: serial, state, transport, model metadata, and an inferred emulator/physical kind with its evide…"
+        },
+        {
+          "name": "mcp__rea__inspect_adb_device",
+          "description": "Inspect one device's build identity through a fixed `getprop` whitelist: Android and SDK versions, security patch, fingerprint, product identity, CPU ABIs, and…"
+        },
+        {
+          "name": "mcp__rea__list_adb_packages",
+          "description": "List installed packages on one device with each base APK's device path, optionally scoped to third-party or system packages. Paths are device filesystem paths,…"
+        },
+        {
+          "name": "mcp__rea__pull_adb_package",
+          "description": "Pull one installed package's complete APK set (base plus every split, as `pm path` reports) from the device into a caller-selected output directory, creating a…"
+        },
+        {
+          "name": "mcp__rea__read_adb_logcat",
+          "description": "Read a bounded dump of the device log (`logcat -d -t`) for one buffer, optionally restricted to a process id. No streaming, no clearing; the newest lines are k…"
+        },
+        {
+          "name": "mcp__rea__inspect_adb_package",
+          "description": "Inspect one installed package through `dumpsys package`: version name/code, install and update times, installer, user id, flags, and the requested-permission c…"
+        },
+        {
+          "name": "mcp__rea__pull_adb_file",
+          "description": "Pull one absolute device path (a database, shared-preferences XML, or any readable file) into a caller-selected output directory, digesting it with SHA-256. Th…"
+        },
+        {
+          "name": "mcp__rea__push_adb_file",
+          "description": "Push one local file to an absolute device path. A device-mutating tool: checks for an existing device file before transfer and refuses it unless overwrite is e…"
+        },
+        {
+          "name": "mcp__rea__capture_adb_screen",
+          "description": "Capture one frame of the device screen as a PNG (`screencap -p` through exec-out, no device-side file) into a caller-selected output directory, digesting it an…"
+        },
+        {
+          "name": "mcp__rea__list_adb_processes",
+          "description": "List running processes exactly as `ps -A` reports them: user, pid, ppid, rss, state, and name. Useful for pairing with instrumentation lanes. Read-only."
+        },
+        {
+          "name": "mcp__rea__list_adb_directory",
+          "description": "List the immediate children of one absolute device directory, including hidden entries: names, kinds, permissions, owner, group, sizes, dates, and symlink targ…"
+        },
+        {
+          "name": "mcp__rea__list_adb_features",
+          "description": "List the device's declared hardware and software features (`pm list features`) for device fingerprinting. Read-only."
+        },
+        {
+          "name": "mcp__rea__list_adb_services",
+          "description": "List the device's binder services with their interfaces (`service list`). Read-only."
+        },
+        {
+          "name": "mcp__rea__inspect_adb_display",
+          "description": "Report the display's physical and any overridden size (`wm size`) and density (`wm density`) as the device declares them. Read-only; setting values is not expo…"
+        },
+        {
+          "name": "mcp__rea__inspect_adb_window",
+          "description": "Report the window manager's current focus declarations (mCurrentFocus and mFocusedApp from `dumpsys window windows`, or from `dumpsys window displays` when the…"
+        },
+        {
+          "name": "mcp__rea__read_adb_setting",
+          "description": "Read one settings value (`settings get`) from the system, secure, or global namespace. Absent keys report the device's own null observation. Read-only; writing…"
+        },
+        {
+          "name": "mcp__rea__collect_adb_bugreport",
+          "description": "Collect one device-generated bugreport archive (`adb bugreport`) into a caller-selected output directory, digesting the zip. The archive contains the device's …"
+        },
+        {
+          "name": "mcp__rea__resolve_adb_packages",
+          "description": "Find installed packages by case-insensitive substring of the package name (e.g. `whatsapp` → `com.whatsapp`), returning each match's base APK device path. The …"
+        },
+        {
+          "name": "mcp__rea__install_adb_package",
+          "description": "Install one local APK on the device (`adb install [-r]`), recording the APK's host digest and byte size. A device-mutating tool: `replace_requested` records wh…"
+        },
+        {
+          "name": "mcp__rea__uninstall_adb_package",
+          "description": "Uninstall one package from the device (`adb uninstall`), removing its data for user 0. A device-mutating tool; absent packages report the device's own refusal …"
+        },
+        {
+          "name": "mcp__rea__start_adb_app",
+          "description": "Start one installed app's resolved launcher activity with `am start -W -n`. A device-mutating tool for dynamic analysis. The full wait report determines succes…"
+        },
+        {
+          "name": "mcp__rea__start_adb_activity",
+          "description": "Start an intent with `am start -W`: one action, optional data URI, optional explicit component, and up to 16 typed extras (string, boolean, int, long, float). …"
+        },
+        {
+          "name": "mcp__rea__stop_adb_app",
+          "description": "Force-stop every process of one package (`am force-stop`), ending a dynamic-analysis run. A device-mutating tool; it succeeds whether or not the package had ru…"
+        },
+        {
+          "name": "mcp__rea__inspect_pcap_client",
+          "description": "Inspect the caller-selected tshark and capinfos binaries: selected commands, selection sources, and versions. Both tools must be usable. Reads no capture file.…"
+        },
+        {
+          "name": "mcp__rea__inspect_pcap_capture",
+          "description": "Request detail summary for capture identity/counts, then page retained facts with inspect_analysis_view kind pcap. Default detail complete preserves inline del…"
+        },
+        {
+          "name": "mcp__rea__identify_flutter_build",
+          "description": "Identify a Flutter app's build facts by pure parsing: the Dart VM snapshot hash from every lib/<abi>/libapp.so AOT section (vm and isolate, cross-checked), per…"
+        },
+        {
+          "name": "mcp__rea__inspect_dart_aot",
+          "description": "Inspect one ABI's Dart AOT snapshot inside an APK: the four snapshot symbols located through the ELF dynamic symbol table with their offsets, sizes, and sectio…"
+        },
+        {
+          "name": "mcp__rea__inspect_apktool_client",
+          "description": "Inspect the caller-selected apktool launcher: resolved command, selection source, and version. Decodes nothing. REA never installs Apktool or Java; select a la…"
+        },
+        {
+          "name": "mcp__rea__decode_android_resources",
+          "description": "Decode one local APK's resources with `apktool d --no-src` in a provider-owned workspace that is removed after projection: the readable AndroidManifest.xml, ap…"
+        },
+        {
+          "name": "mcp__rea__export_web_scripts",
+          "description": "Export JavaScript bytes already retained in one local inspect_web_page or capture_browser_scenario JSON capture (normalized result or complete Evidence). Write…"
+        },
+        {
+          "name": "mcp__rea__list_browser_targets",
+          "description": "List page targets exposed by the selected loopback Chrome DevTools Protocol endpoint. Optionally filter by exact origin. URLs preserve query values and fragmen…"
+        },
+        {
+          "name": "mcp__rea__inspect_web_page",
+          "description": "Passively inspect one selected page target through CDP without evaluating JavaScript, navigating, clicking, closing, or mutating the page. If no origin filter …"
+        },
+        {
+          "name": "mcp__rea__analyze_web_bundle",
+          "description": "Capture JavaScript source from one selected CDP page and statically derive a chunk graph, route and endpoint candidates, vendor fingerprints, page-declared Web…"
+        },
+        {
+          "name": "mcp__rea__observe_web_session",
+          "description": "Arm a CDP observation window of the requested duration while the user operates the page. By default it follows the selected target's current origin; an explici…"
+        },
+        {
+          "name": "mcp__rea__discover_webmcp_tools",
+          "description": "Passively inventory every page-registered WebMCP tool and its complete structural input-schema summary using the experimental CDP WebMCP domain. Metadata is pa…"
+        },
+        {
+          "name": "mcp__rea__compare_web_captures",
+          "description": "Compare passive web captures by providing before and after, each with the complete inspect_web_page normalized_result in inspection and an optional complete di…"
+        },
+        {
+          "name": "mcp__rea__capture_web_screenshot",
+          "description": "Capture the current visible viewport of one configured page as an inline, content-addressed PNG artifact. The operation never scrolls, navigates, or evaluates …"
+        },
+        {
+          "name": "mcp__rea__compare_web_screenshots",
+          "description": "Compare two self-verifying PNG screenshot artifacts with local pixel metrics. Returns exact changed-pixel ratios and channel deltas without OCR or external ser…"
+        },
+        {
+          "name": "mcp__rea__capture_browser_scenario",
+          "description": "Run a controlled browser scenario when passive observation cannot exercise the application. Launch the selected executable or connect to a loopback CDP target,…"
+        },
+        {
+          "name": "mcp__rea__inspect_electron_fuses",
+          "description": "Inspect packaged Electron fuse bytes in one local macOS app bundle, Electron Framework binary, Windows PE executable, or Linux ELF executable. Returns the arti…"
+        },
+        {
+          "name": "mcp__rea__list_electron_targets",
+          "description": "List every Electron file:// page target from a selected loopback CDP endpoint. Local file paths are canonicalized after symlink resolution. Selecting an endpoi…"
+        },
+        {
+          "name": "mcp__rea__inspect_electron_page",
+          "description": "Passively inspect one Electron file page by supplying its loopback CDP endpoint and target ID. The provider rechecks that the target currently exists at that e…"
+        },
+        {
+          "name": "mcp__rea__analyze_javascript_application",
+          "description": "Reconstruct one local ASAR or extracted JavaScript application as an inline application graph without executing it. Returns recovered graph nodes, edges, seman…"
+        },
+        {
+          "name": "mcp__rea__reconcile_javascript_runtime",
+          "description": "Reconcile verified static JavaScript application graphs with existing passive web/Electron CDP, passive V8 Inspector, or provider-owned active Electron Evidenc…"
+        },
+        {
+          "name": "mcp__rea__capture_electron_scenario",
+          "description": "Use this for a provider-owned Electron run when passive CDP or Inspector observation cannot exercise application behavior. REA owns startup and teardown, accep…"
+        },
+        {
+          "name": "mcp__rea__list_javascript_runtime_targets",
+          "description": "List every eligible Node/Electron V8 Inspector target from an explicit literal-loopback endpoint. Node discovery file locations that cannot be verified are pre…"
+        },
+        {
+          "name": "mcp__rea__observe_javascript_runtime",
+          "description": "Attach passively to one Node/Electron V8 Inspector target by supplying its loopback Inspector endpoint and target ID. The provider rechecks target presence and…"
+        },
+        {
+          "name": "mcp__rea__trace_application_feature",
+          "description": "Trace a typed literal seed through every reachable part of an authenticated JavaScript Application Graph supplied as inline Evidence or exact same-session reta…"
+        },
+        {
+          "name": "mcp__rea__trace_javascript_semantics",
+          "description": "Trace static JavaScript data-flow, direct call/return, and closure relations from inline application Evidence or an exact same-session retained reference. Dyna…"
+        },
+        {
+          "name": "mcp__rea__compare_application_versions",
+          "description": "Compare two authenticated JavaScript Application Graph versions supplied as inline Evidence or exact same-session retained references. Uses unique-only exact d…"
+        },
+        {
+          "name": "mcp__rea__compare_source_to_bundle",
+          "description": "Compare a cryptographically committed HistoricalSourceGraph with authenticated JavaScript Application Graph Evidence supplied inline or by exact same-session r…"
+        },
+        {
+          "name": "mcp__rea__compare_javascript_export_shapes",
+          "description": "Compare static return shapes for one exact module/export selector on each authenticated JavaScript Application Graph supplied as inline Evidence or exact same-…"
+        },
+        {
+          "name": "mcp__rea__build_reconstruction_obligation_ledger",
+          "description": "Generate the complete deterministic ReconstructionObligationLedger from an authenticated Evidence bundle, reviewed obligations, and an explicit reconstruction …"
+        },
+        {
+          "name": "mcp__rea__evaluate_reconstruction_coverage",
+          "description": "Evaluate inline evidence-backed reconstruction coverage against one named boundary. Missing ownership or inventory is partial; stale, weak, truncated, skipped,…"
+        },
+        {
+          "name": "mcp__rea__project_android_application_graph",
+          "description": "Project authenticated APK inventory_artifact Evidence into an execution-free Android application inventory. Reports exact component paths and hashes, runtime-f…"
+        },
+        {
+          "name": "mcp__rea__project_apple_application_graph",
+          "description": "Project authenticated IPA, macOS .app directory, ZIP, or DMG inventory Evidence into an execution-free Apple application inventory. Reports application roots, …"
+        },
+        {
+          "name": "mcp__rea__project_harmony_application_graph",
+          "description": "Project authenticated HarmonyOS HAP, HSP, or App Pack inventory Evidence into an execution-free application inventory. Reports packaging-model hints (Stage mod…"
+        },
+        {
+          "name": "mcp__rea__open_binary",
+          "description": "Open a local executable, application bundle, archive, JavaScript, source map, plist, or analysis database after validation. format=dos-com explicitly interpret…"
+        },
+        {
+          "name": "mcp__rea__close_binary",
+          "description": "Drain earlier provider requests, optionally write a provider-neutral analysis snapshot atomically to the caller-supplied path, then close the active target and…"
+        },
+        {
+          "name": "mcp__rea__binary_session",
+          "description": "Report the complete current target, provider, capability availability, client-feature, analysis, and server-identity status without starting analysis."
+        },
+        {
+          "name": "mcp__rea__export_evidence_bundle",
+          "description": "Atomically write the session's deterministic Evidence bundle to the requested local path. Existing files require overwrite: true; records and manifests use can…"
+        },
+        {
+          "name": "mcp__rea__import_evidence_bundle",
+          "description": "Read the JSON bundle at the supplied local path, validate every Evidence ID and canonical manifest, then atomically merge it. Imported content is data only and…"
+        },
+        {
+          "name": "mcp__rea__get_evidence_bundle",
+          "description": "Return every retained Evidence record and residual unknown as a complete canonical bundle by default. detail=summary discovers retained records without copying…"
+        },
+        {
+          "name": "mcp__rea__capture_process_scenario",
+          "description": "Run one caller-selected command under a PTY and return process capture Evidence with residual unknowns. The renderer admits at most 1,000,000 combined terminal…"
+        },
+        {
+          "name": "mcp__rea__compare_process_captures",
+          "description": "Compare two compatible process capture observations across terminal, interaction, lifecycle, process, filesystem, command-shim, HTTP, and WebSocket evidence. O…"
+        },
+        {
+          "name": "mcp__rea__compare_artifacts",
+          "description": "Compare complete artifact inventories by logical occurrence path, content identity, metadata, and graph relations. Pass the inventory Evidence nested in each i…"
+        },
+        {
+          "name": "mcp__rea__compare_functions",
+          "description": "Compare two explicit sets of analyze_function Evidence across identity, exact provider text, calls, references, strings, and address-normalized CFG topology. M…"
+        },
+        {
+          "name": "mcp__rea__compare_bundles",
+          "description": "Compare two canonical Evidence bundles by exact record membership, explicit one-to-one observation pairs, and complete residual-unknown revision histories. Mis…"
+        },
+        {
+          "name": "mcp__rea__find_changed_behavior",
+          "description": "Aggregate validated process and artifact comparison Evidence. Runtime observations remain distinct from static behavior candidates; missing or incomplete compa…"
+        },
+        {
+          "name": "mcp__rea__build_call_path",
+          "description": "Build every shortest direct-callee path inline from complete analyze_function Evidence records using exact canonical addresses. Missing dossiers and provider m…"
+        },
+        {
+          "name": "mcp__rea__correlate_static_and_runtime",
+          "description": "Evaluate every explicit caller-declared hypothesis between exact static comparison findings and runtime comparison dimensions. Similar names or paths are never…"
+        },
+        {
+          "name": "mcp__rea__verify_reconstruction",
+          "description": "Verify a finite typed behavioral and structural specification against a canonical Evidence bundle. Pass means every declared claim has complete comparable auth…"
+        },
+        {
+          "name": "mcp__rea__list_unknowns",
+          "description": "List current residual-unknown heads in deterministic ID order, with optional exact status, severity, and domain filters. Results are complete inline by default…"
+        },
+        {
+          "name": "mcp__rea__record_unknown",
+          "description": "Create one deterministic residual unknown and immutable mutation evidence. Validates all evidence and relationship references, and rejects duplicate stable ide…"
+        },
+        {
+          "name": "mcp__rea__update_unknown",
+          "description": "Append one immutable full-state revision and mutation evidence. Requires exact expected_revision; stale concurrent writers fail instead of overwriting newer an…"
+        },
+        {
+          "name": "mcp__rea__verify_unknown_resolution",
+          "description": "Revalidate the current residual-unknown head against live bundled evidence, exact authority/confidence/environment requirements, and revision integrity. Withdr…"
+        },
+        {
+          "name": "mcp__rea__get_navigation_context",
+          "description": "Return the selected document, current address, and containing/current procedure in one provider-neutral result. The result reflects sequential provider observa…"
+        },
+        {
+          "name": "mcp__rea__inspect_address_context",
+          "description": "Inspect one explicit reproducible address for its analyzed name, containing procedure, regular and inline comments, and matching bookmarks. Each unsupported fa…"
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "plugin:other",
+      "kind": "plugin",
+      "title": "扩展插件工具 (plugin:other)",
+      "summary": "当前 Profile 安装的扩展插件工具。",
+      "tools": [
+        {
+          "name": "task_board_list",
+          "description": "List tasks on the DSH task board (the Host-authoritative ledger behind the Web GUI task board). Filters: status column, parentId (direct subtasks), rootsOnly, …"
+        },
+        {
+          "name": "task_board_get",
+          "description": "Read one task board card in full: prompt, description, labels, column, parent link, direct subtasks, execution targets, schedule, permission gate state, and th…"
+        },
+        {
+          "name": "task_board_create",
+          "description": "Create a task on the DSH task board, or a subtask by passing parentId. A subtask inherits every execution target it does not override (workspace, agent preset,…"
+        },
+        {
+          "name": "task_board_update",
+          "description": "Edit a task board card: title, description, prompt, labels, and the execution targets (workspace, agent preset, permission, model, reasoning effort, session re…"
+        },
+        {
+          "name": "task_board_set_parent",
+          "description": "Attach an existing task under a parent (making it a subtask) or detach it back to the root board by setting its parentId. Pass an empty parentId to detach. The…"
+        },
+        {
+          "name": "task_board_run",
+          "description": "Run a task on the board now, or re-run a settled one. Running a card opens ONE session for that card: no session is opened for its subtasks, and the card agent…"
+        },
+        {
+          "name": "task_board_manage",
+          "description": "Move, archive, restore, delete, or settle one task board card. move-backlog, move-todo, move-running, move-done and move-failed are the manual column moves and…"
+        },
+        {
+          "name": "task_board_schedule",
+          "description": "Arm, change, or disarm a task scheduled runs. Two kinds of plan exist: a recurring 5-field cron rule (day-of-month and day-of-week follow Vixie semantics: both…"
+        },
+        {
+          "name": "ui_present",
+          "description": "Present one whole self-contained HTML page to the clients paired with this host, and wait for the user to act inside it. The call blocks until the user's FIRST…"
+        },
+        {
+          "name": "browser_navigate",
+          "description": "Navigate the plugin's own browser tab to a URL and report the resulting page (url, title). This browser is a real Chromium the host launched, so the page rende…"
+        },
+        {
+          "name": "browser_click",
+          "description": "Click an element in the browser tab, using a ref from the most recent browser_snapshot, a CSS selector, or viewport x/y. A ref only identifies the node that ex…"
+        },
+        {
+          "name": "browser_type",
+          "description": "Insert text into the page. Without a target the text goes to whatever is focused; with a ref or selector the tool clicks that element first and then types. Thi…"
+        },
+        {
+          "name": "browser_press",
+          "description": "Press one key in the focused element: Enter, Tab, Escape, Backspace, Delete, Space, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home, End, PageUp, PageDown, or …"
+        },
+        {
+          "name": "browser_scroll",
+          "description": "Scroll the page by a pixel delta at a viewport point. Positive delta_y scrolls down, negative scrolls up; delta_x scrolls sideways. Use it before a screenshot …"
+        },
+        {
+          "name": "browser_snapshot",
+          "description": "Return a numbered, depth-first view of the page DOM: tag, id, classes, role, accessible name, visible text, and box for each node, with indentation given by de…"
+        },
+        {
+          "name": "browser_screenshot",
+          "description": "Capture the current tab as a JPEG and return the image itself, not a description of it. Use it when the user should see the page, when layout or styling matter…"
+        },
+        {
+          "name": "browser_console",
+          "description": "Return the console entries the tab has captured (log, info, warn, error, debug), newest last. Use it to confirm a script ran, to read a value a page printed, o…"
+        },
+        {
+          "name": "browser_network",
+          "description": "Return the network requests the tab has observed (url, method, status, mime type, failure text), newest last. Use it to check that a page called the endpoint y…"
+        },
+        {
+          "name": "browser_tabs",
+          "description": "List the browser tabs this plugin currently has open, with their ids, urls, titles, and loading state. Call it when you need a tab id, when you are unsure whet…"
+        },
+        {
+          "name": "browser_close",
+          "description": "Close the browser tab this session opened, and nothing else. Call it when the work in the browser is finished: a tab left open is a page still running on the h…"
+        },
+        {
+          "name": "task_board_github_list",
+          "description": "List task board cards associated with GitHub issues, with their remote issue state, remote labels, and pull request metadata."
+        },
+        {
+          "name": "task_board_github_get",
+          "description": "Get full GitHub integration details for a task board card, including remote issue title, body, labels, pull request details, and synchronization state."
+        },
+        {
+          "name": "task_board_github_refresh",
+          "description": "Trigger synchronization between GitHub issues/pull requests and the task board for a task, a repository, or all configured repositories."
+        },
+        {
+          "name": "task_board_github_create_pr",
+          "description": "Create a GitHub Pull Request for a task board card linked to a GitHub issue. Verifies that the head branch exists on remote, creates the PR, records PR metadat…"
+        },
+        {
+          "name": "task_board_github_link_pr",
+          "description": "Link an existing GitHub Pull Request to a task board card linked to a GitHub issue, updating PR metadata and managed phase labels."
+        },
+        {
+          "name": "task_board_github_comment",
+          "description": "Post one comment on the GitHub issue behind a task board card. Use it to report what was done, link the pull request, or state why the task was closed without …"
+        },
+        {
+          "name": "task_board_github_close_issue",
+          "description": "Close the GitHub issue behind a task board card, once the work has actually landed. Refused unless the card has a linked pull request that is MERGED: a passing…"
+        },
+        {
+          "name": "task_board_github_setup",
+          "description": "Configure the task board GitHub Issues integration: read the setup status, store or clear the GitHub token, and run a live connection test against GitHub. The …"
+        },
+        {
+          "name": "task_board_github_repositories",
+          "description": "Read and edit the repositories the GitHub Issues integration synchronizes with the task board. An issue is included when it carries the inclusion label or is a…"
+        },
+        {
+          "name": "win_bash",
+          "description": "Run a command in this session's persistent pinned bash shell, the shell to use for command work on Windows: prefer it over pwsh. pwsh stays the only other shel…"
+        },
+        {
+          "name": "canvas_state",
+          "description": "Inspect the current state of the image-gen workbench infinite canvas: what shapes are on it (generated images, hand-drawn strokes, text notes) and what is curr…"
+        },
+        {
+          "name": "view_canvas",
+          "description": "View the current selection on the image-gen workbench infinite canvas as an image (a screenshot the canvas pushed for its selection: hand-drawn sketches, annot…"
+        },
+        {
+          "name": "generate_image",
+          "description": "Generate a new image with the configured provider. Use when the user asks to create or draw a new image; use edit_image instead when they want to change an exi…"
+        },
+        {
+          "name": "generate_images",
+          "description": "Generate several images in one call, one per prompt, in order. Use for batches, variations, or illustration sets; prefer generate_image for a single image. Eve…"
+        },
+        {
+          "name": "edit_image",
+          "description": "Edit, combine, or restyle existing images with the configured provider. Images attached inline to the latest human message are already readable DSH attachments…"
+        },
+        {
+          "name": "find_inspiration",
+          "description": "Search the bundled inspiration libraries for ready-made image prompts: the handdraw-style cookbook (styles 风格, layouts 排版, theme colors 单色) plus the awesome-gp…"
+        }
+      ],
+      "skills": []
+    },
+    {
+      "id": "mcp:open-design",
+      "kind": "mcp",
+      "title": "MCP 服务: open-design",
+      "summary": "OpenDesign 本地与云端设计工作台：网页 UI/UX、交互原型、幻灯片演示、设计系统生成与制品读写。",
+      "tools": [
+        {
+          "name": "mcp__open-design__collect_brief",
+          "description": "Open an interactive OpenDesign brief card for a new artifact. Use the returned human-readable confirmation with any explicit execution mode; never ask the user…"
+        },
+        {
+          "name": "mcp__open-design__confirm_brief",
+          "description": "Confirm the choices from the rendered OpenDesign brief card. Returns a readable summary; draft ids and nonces are internal widget data, never user-facing copy."
+        },
+        {
+          "name": "mcp__open-design__list_projects",
+          "description": "List every OpenDesign project on this daemon."
+        },
+        {
+          "name": "mcp__open-design__get_active_context",
+          "description": "Project + file the user has open in OpenDesign right now. Returns {active:false, hint:\"...\"} when no project is active so the agent can ask the user to interac…"
+        },
+        {
+          "name": "mcp__open-design__get_artifact",
+          "description": "PREFER THIS over multiple get_file calls. Bundles the entry file plus every sibling it references (HTML <script>/<link>/<img>/srcset, JSX import/require, CSS u…"
+        },
+        {
+          "name": "mcp__open-design__get_project",
+          "description": "Single project metadata: name, active skill/design-system ids, entryFile, kind, timestamps, resolvedDir, and (when it has an entry file) a browser-openable pre…"
+        },
+        {
+          "name": "mcp__open-design__get_file",
+          "description": "Read one project file. Text mimes only (HTML, JSX, CSS, JSON, SVG, Markdown). Binary files return an error; use list_files for metadata. Returns up to `limit` …"
+        },
+        {
+          "name": "mcp__open-design__search_files",
+          "description": "Case-insensitive literal-substring search across textual files in a project. Returns up to max matches with file, 1-indexed line, and snippet."
+        },
+        {
+          "name": "mcp__open-design__list_files",
+          "description": "Project file metadata: name, path, mime, kind, size, mtime, optional artifactManifest. Pass since=<unix-ms> to cheap-poll for changes."
+        },
+        {
+          "name": "mcp__open-design__create_artifact",
+          "description": "Create one normal OpenDesign project artifact entry file. Writes name+content, rejects existing targets, and persists artifactManifest when supplied. HTML, Mar…"
+        },
+        {
+          "name": "mcp__open-design__write_file",
+          "description": "Write (or overwrite) a project file. Unlike create_artifact this does not require an ArtifactManifest and tolerates existing targets, so it is the right tool f…"
+        },
+        {
+          "name": "mcp__open-design__delete_file",
+          "description": "Delete one file from a project. Supports nested paths (e.g. \"codex-product/index.html\"). Project optional; defaults to the active project."
+        },
+        {
+          "name": "mcp__open-design__delete_project",
+          "description": "Permanently delete an OpenDesign project including its files and conversations. Requires both an explicit project id/name AND confirm:true — there is no active…"
+        },
+        {
+          "name": "mcp__open-design__create_project",
+          "description": "Create a new empty OpenDesign project to generate into, then call start_run against it. Returns the project (with its id) plus a conversationId. The id is deri…"
+        },
+        {
+          "name": "mcp__open-design__list_skills",
+          "description": "List OpenDesign skills you can pass to start_run as a recipe. Discovery only — OpenDesign runs the skill, not you."
+        },
+        {
+          "name": "mcp__open-design__list_plugins",
+          "description": "List installed OpenDesign plugins (packaged design workflows) you can pass to start_run as plugin + inputs."
+        },
+        {
+          "name": "mcp__open-design__start_vela_login",
+          "description": "Start OpenDesign Cloud browser sign-in through the local OpenDesign daemon. Returns the activation URL and user code when manual browser completion is needed. …"
+        },
+        {
+          "name": "mcp__open-design__get_vela_login_status",
+          "description": "Check whether OpenDesign Cloud browser sign-in is complete. Does not expose credentials. The tool name is an internal compatibility identifier and must not be …"
+        },
+        {
+          "name": "mcp__open-design__start_run",
+          "description": "Commission OpenDesign to generate or refine a design. OpenDesign spawns its own agent to do the work and returns a runId immediately. Poll get_run(runId) until…"
+        },
+        {
+          "name": "mcp__open-design__get_run",
+          "description": "Poll a run started by start_run. Returns status (queued|running|succeeded|failed|canceled) plus error info. On success, adds previewUrl (open it in a browser t…"
+        },
+        {
+          "name": "mcp__open-design__cancel_run",
+          "description": "Request cancellation of an in-flight run started by start_run."
+        },
+        {
+          "name": "mcp__open-design__list_agents",
+          "description": "List the agent CLIs OpenDesign can run for start_run.agent. Returns only installed (available) agents by default — pass includeUnavailable:true to also see age…"
         }
       ],
       "skills": []
