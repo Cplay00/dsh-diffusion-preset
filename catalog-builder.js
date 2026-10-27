@@ -441,6 +441,7 @@ export function createCatalogPolicy(config = {}) {
     mcpDescriptions: Object.assign(Object.create(null), config.mcpDescriptions ?? KNOWN_MCP_DESCRIPTIONS),
     companionGroups: config.companionGroups ?? COMPANION_GROUPS,
     skillCompanions: Object.assign(Object.create(null), config.skillCompanions ?? DEFAULT_SKILL_COMPANIONS),
+    inferSkillCompanions: config.inferSkillCompanions !== false,
     usageReminder: config.usageReminder === false ? '' : config.usageReminder ?? USAGE_REMINDER_FOOTER,
   };
 }

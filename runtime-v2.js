@@ -11,18 +11,30 @@ const VIEW_HOOK_SYM = Symbol.for('dsh.diffusion.viewHook.v3');
 /** Format a JSON Schema parameter property for human/LLM-readable detail output. */
 function formatParameterSchema(parameters) {
   if (!parameters || typeof parameters !== 'object') return '  (No parameters)';
-  let props = parameters.properties ?? {};
+  let props = { ...(parameters.properties ?? {}) };
   const required = new Set(Array.isArray(parameters.required) ? parameters.required : []);
 
-  if (Object.keys(props).length === 0) {
-    const branches = parameters.oneOf ?? parameters.anyOf ?? parameters.allOf;
-    if (Array.isArray(branches)) {
-      for (const b of branches) {
-        if (b && typeof b === 'object' && b.properties) {
-          props = { ...props, ...b.properties };
-          if (Array.isArray(b.required)) {
-            for (const r of b.required) required.add(r);
-          }
+  if (Array.isArray(parameters.allOf)) {
+    for (const b of parameters.allOf) {
+      if (b && typeof b === 'object' && b.properties) {
+        props = { ...props, ...b.properties };
+        if (Array.isArray(b.required)) {
+          for (const r of b.required) required.add(r);
+        }
+      }
+    }
+  } else if (Array.isArray(parameters.oneOf) || Array.isArray(parameters.anyOf)) {
+    const branches = (parameters.oneOf ?? parameters.anyOf).filter(b => b && typeof b === 'object' && b.properties);
+    for (const b of branches) {
+      props = { ...props, ...b.properties };
+    }
+    if (branches.length > 0) {
+      // In oneOf / anyOf, a property is only strictly required if required in ALL branches
+      for (const key of Object.keys(props)) {
+        if (required.has(key)) continue;
+        const requiredInAll = branches.every(b => Array.isArray(b.required) && b.required.includes(key));
+        if (requiredInAll) {
+          required.add(key);
         }
       }
     }
@@ -467,14 +479,16 @@ const QUERY_SYNONYMS = {
   /** Stage 2: Lookup specific names and descriptions by category and/or keyword query. */
   function renderLookupStage(inventory, args) {
     const { allToolsMap, skills } = inventory;
-    const rawOffset = Number(args.offset);
-    const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
-    const rawLimit = Number(args.limit);
-    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(100, Math.floor(rawLimit)) : 20;
-
     let rawCat = (args.category ?? '').trim().toLowerCase();
     if (CATEGORY_ALIASES[rawCat]) rawCat = CATEGORY_ALIASES[rawCat].toLowerCase();
     const rawQuery = (args.query ?? '').trim().toLowerCase();
+    const isKeywordSearch = Boolean(rawQuery);
+
+    const rawOffset = Number(args.offset);
+    const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
+    const rawLimit = Number(args.limit);
+    const maxLimit = isKeywordSearch ? 20 : 100;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(maxLimit, Math.floor(rawLimit)) : 20;
     const rawTokens = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
     const expandedSynonyms = new Set();
     for (const token of rawTokens) {
@@ -1156,8 +1170,8 @@ const QUERY_SYNONYMS = {
       const alias = Object.entries(CATEGORY_ALIASES).find(([k, v]) => v === family)?.[0] || family;
       const msg = `Diffusion Mode Guard: Tool "${toolName}" is installed in this harness (${family}) but is currently locked to preserve context budget.\n💡 Recommendation: Search capabilities with \`call_directory({ query: "${toolName}" })\`, or mount directly with \`call_directory({ names: [${JSON.stringify(toolName)}] })\` or category \`call_directory({ names: [${JSON.stringify(alias)}] })\`.`;
       return {
-        kind: 'block',
-        feedback: [{ type: 'text', text: msg }],
+        kind: 'deny',
+        reason: msg,
       };
     }
     return next();
@@ -1186,13 +1200,28 @@ const QUERY_SYNONYMS = {
   });
 
   // Auto-unlock companion tools if the model invokes the `skill` tool directly
-  ctx.on('tools/result', (exec, result) => {
+  ctx.on('tools/result', async (exec, result) => {
     const agent = exec?.agent;
     if (result?.isError || !agent || !controller.ownsAgent(agent) || exec?.name !== 'skill') return;
     const skillName = exec?.arguments?.name;
     if (typeof skillName !== 'string') return;
-    const allToolNames = new Set(viewHook.unfilteredView(agent).visible.keys());
-    const companions = [...expandCompanionTools(companionToolsForSkill(skillName, allToolNames, policy), allToolNames, policy.companionGroups)];
+
+    let skillObj = null;
+    try {
+      const cwd = (await ctx.workingDirectory?.ensure(agent)) || ctx.workingDirectory?.defaultDirectory || process.cwd();
+      skillObj = await ctx.skills?.get(skillName, { cwd, scope: agent });
+    } catch {
+      // Ignore retrieval errors
+    }
+
+    const inventory = await buildInventory(agent);
+    const { allToolsMap, categories } = inventory;
+    const allToolNames = new Set(allToolsMap.keys());
+    const companions = [...expandCompanionTools(
+      companionToolsForSkill(skillName, allToolNames, policy, categories, skillObj),
+      allToolNames,
+      policy.companionGroups
+    )];
     if (companions.length === 0) return;
     const state = getAgentState(agent);
     let added = false;

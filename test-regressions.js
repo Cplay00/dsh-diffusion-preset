@@ -492,8 +492,8 @@ test('multilingual keyword search and prominent search-first recommendations', a
   let passedNext = false;
   const decision = await preExecuteHooks[0](lockedExec, async () => { passedNext = true; return { kind: 'allow' }; });
   assert.equal(passedNext, false);
-  assert.equal(decision.kind, 'block');
-  assert.match(decision.feedback[0].text, /Recommendation: Search capabilities with `call_directory\(\{ query: "browser_navigate" \}\)`/);
+  assert.equal(decision.kind, 'deny');
+  assert.match(decision.reason, /Recommendation: Search capabilities with `call_directory\(\{ query: "browser_navigate" \}\)`/);
 });
 
 test('dynamic classification and heuristic companion deduction for installed capabilities', async t => {
@@ -521,6 +521,73 @@ test('dynamic classification and heuristic companion deduction for installed cap
   assert(skillResult.loadedSkills.includes('custom-spreadsheet-analyzer'));
   assert(skillResult.unlocked.includes('read'));
   assert(skillResult.unlocked.includes('load_workspace_dependencies'));
+});
+
+test('inferSkillCompanions can be disabled via config', async t => {
+  const h = harness(t, { inferSkillCompanions: false }, { names: ['load_workspace_dependencies', 'read', 'write'] });
+  const agent = h.agent();
+  h.skillDefs.set('custom-doc-skill', {
+    name: 'custom-doc-skill',
+    description: 'A tool for editing word and docx documents',
+    content: 'Content',
+  });
+  const res = await h.call(agent, { names: ['custom-doc-skill'] });
+  assert.deepEqual(res.loadedSkills, ['custom-doc-skill']);
+  // When inferSkillCompanions is disabled, it does NOT unlock read, write, etc.
+  assert(!h.visible(agent).includes('read'));
+  assert(!h.visible(agent).includes('load_workspace_dependencies'));
+});
+
+test('union parameter schema (oneOf/anyOf) does not falsely mark mutually exclusive branch fields as required', async t => {
+  const h = harness(t, {}, { names: ['union_tool'] });
+  const agent = h.agent();
+  h.definitions.set('union_tool', {
+    name: 'union_tool',
+    description: 'Fetch by path or url',
+    parameters: {
+      oneOf: [
+        { properties: { file_path: { type: 'string', description: 'Local path' } }, required: ['file_path'] },
+        { properties: { url: { type: 'string', description: 'Remote URL' } }, required: ['url'] }
+      ]
+    }
+  });
+  const res = await h.call(agent, { names: ['union_tool'] });
+  assert.match(res.report, /`file_path` \(string, optional\)/);
+  assert.match(res.report, /`url` \(string, optional\)/);
+  assert.doesNotMatch(res.report, /`file_path` \(string, required\)/);
+  assert.doesNotMatch(res.report, /`url` \(string, required\)/);
+});
+
+test('native skill tool callback triggers identical companion expansion with categories and inference', async t => {
+  const h = harness(t, {}, { names: ['browser_navigate', 'browser_click'] });
+  const agent = h.agent();
+  h.skillDefs.set('kimi-webbridge', {
+    name: 'kimi-webbridge',
+    description: 'Control real browser via extension',
+    content: 'Browser instructions',
+  });
+  // Simulate native skill tool execution result
+  const skillHook = h.hooks.get('tools/result')?.[0];
+  assert(skillHook, 'tools/result hook must be registered');
+  await skillHook({ agent, name: 'skill', arguments: { name: 'kimi-webbridge' } }, { isError: false });
+  assert(h.visible(agent).includes('browser_navigate'));
+  assert(h.visible(agent).includes('browser_click'));
+});
+
+test('keyword search caps at 20 items and requires no default limit parameters', async t => {
+  const h = harness(t, {}, {
+    names: Array.from({ length: 40 }, (_, i) => `search_target_${String(i).padStart(2, '0')}`)
+  });
+  const agent = h.agent();
+  // Without limit parameter, keyword search returns at most 20 items
+  const resDefault = await h.call(agent, { action: 'lookup', query: 'search_target' });
+  const countDefault = (resDefault.report.match(/^- `search_target_/gm) || []).length;
+  assert.equal(countDefault, 20);
+
+  // Even if caller asks for limit: 100, keyword search is capped at 20
+  const resCapped = await h.call(agent, { action: 'lookup', query: 'search_target', limit: 100 });
+  const countCapped = (resCapped.report.match(/^- `search_target_/gm) || []).length;
+  assert.equal(countCapped, 20);
 });
 
 function temporaryDirectory(t) {
