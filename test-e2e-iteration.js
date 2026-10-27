@@ -148,4 +148,12 @@ const guideLines = promptGuide.split('\n').filter(l => l.trim().length > 0);
 assert(guideLines.length <= 25, `Guide should be concise (currently ${guideLines.length} lines)`);
 console.log(`✓ Test 8: System prompt guide is ultra-crisp (${guideLines.length} lines vs original 35+ lines)`);
 
-console.log('\nAll 8 mock runtime checks passed.');
+// Test 9: Case-insensitive skill mounting and image alias
+const skillRes = await registeredTool.execute({ names: ['skill:Docx'] }, { agent: mockAgent });
+assert.strictEqual(skillRes.stage, 'detail');
+assert(skillRes.loadedSkills.includes('docx'), 'Must load docx skill regardless of case');
+assert(skillRes.report.includes('skill_content name="docx"'), 'Must render skill content');
+
+console.log('✓ Test 9: Case-insensitive skill loading passed');
+
+console.log('\nAll 9 mock runtime checks passed.');

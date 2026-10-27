@@ -391,18 +391,71 @@ test('all result stages satisfy the declared output fields and unknown actions r
   await assert.rejects(h.call(agent, { action: 'typo' }), /Unknown directory action/);
 });
 
-test('MCP and team prompt sections follow actual tool visibility', async t => {
-  const h = harness(t, {}, { names: ['mcp__acme__query', 'spawn_teammate'] });
+test('MCP, team, and image prompt sections follow actual tool visibility', async t => {
+  const h = harness(t, {}, { names: ['mcp__acme__query', 'spawn_teammate', 'generate_image'] });
   const agent = h.agent();
-  const original = { sections: [{ name: 'mcp:acme' }, { name: 'team:policy' }, { name: 'user' }], contexts: [{ name: 'team:identity' }] };
+  const original = {
+    sections: [
+      { name: 'mcp:acme' },
+      { name: 'team:policy' },
+      { name: 'dsh-image-gen:defaults' },
+      { name: 'user' },
+    ],
+    contexts: [{ name: 'team:identity' }],
+  };
   const assemble = () => h.hooks.get('system-prompt/assemble')[0](null, { scope: agent }, async () => original);
   assert.deepEqual((await assemble()).sections, [{ name: 'user' }]);
   await h.call(agent, { names: ['mcp:acme'] });
   assert((await assemble()).sections.some(s => s.name === 'mcp:acme'));
+  assert(!(await assemble()).sections.some(s => s.name === 'dsh-image-gen:defaults'));
+  await h.call(agent, { names: ['generate_image'] });
+  assert((await assemble()).sections.some(s => s.name === 'dsh-image-gen:defaults'));
   await h.call(agent, { names: ['*'] });
   await h.call(agent, { action: 'unload', names: ['spawn_teammate'] });
   assert(!(await assemble()).sections.some(s => s.name === 'team:policy'));
   assert.equal((await assemble()).contexts.length, 0);
+});
+
+test('image and browser plugin families, aliases, and companion groups expand cleanly', async t => {
+  const imageTools = ['generate_image', 'generate_images', 'edit_image', 'canvas_state', 'view_canvas', 'find_inspiration'];
+  const browserTools = ['browser_navigate', 'browser_click', 'browser_snapshot'];
+  const h = harness(t, {}, { names: [...imageTools, ...browserTools] });
+  const agent = h.agent();
+
+  // Test alias 'image' mounts all image-gen tools
+  const mountImage = await h.call(agent, { names: ['image'] });
+  for (const tName of imageTools) {
+    assert(mountImage.unlocked.includes(tName));
+    assert(h.visible(agent).includes(tName));
+  }
+
+  // Test alias 'browser' mounts browser tools
+  const mountBrowser = await h.call(agent, { names: ['browser'] });
+  for (const tName of browserTools) {
+    assert(mountBrowser.unlocked.includes(tName));
+    assert(h.visible(agent).includes(tName));
+  }
+
+  // Test companion expansion: mounting generate_image automatically unlocks edit_image and canvas_state
+  await h.call(agent, { action: 'reset' });
+  const singleMount = await h.call(agent, { names: ['generate_image'] });
+  assert(singleMount.unlocked.includes('generate_image'));
+  assert(singleMount.unlocked.includes('edit_image'));
+  assert(singleMount.unlocked.includes('canvas_state'));
+});
+
+test('skill case-insensitivity with skill: prefix and default skill companions unlocking', async t => {
+  const h = harness(t, {}, { names: ['read', 'write', 'edit', 'load_workspace_dependencies'] });
+  const agent = h.agent();
+  h.skillDefs.set('docx', { name: 'docx', description: 'DOCX Suite', content: 'Generate word doc' });
+
+  // Mounting with mixed case 'skill:Docx' works and auto-unlocks default companions
+  const result = await h.call(agent, { names: ['skill:Docx'] });
+  assert.deepEqual(result.loadedSkills, ['docx']);
+  assert(h.visible(agent).includes('read'));
+  assert(h.visible(agent).includes('write'));
+  assert(h.visible(agent).includes('edit'));
+  assert(h.visible(agent).includes('load_workspace_dependencies'));
 });
 
 function temporaryDirectory(t) {

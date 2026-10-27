@@ -22,6 +22,9 @@ export const COMPANION_GROUPS = [
   ['session_search', 'session_trace', 'session_event_search', 'session_event_read', 'session_event_trace'],
   ['cordis_inspect_list', 'cordis_inspect_query'],
   ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource'],
+  ['generate_image', 'generate_images', 'edit_image', 'canvas_state', 'view_canvas', 'find_inspiration'],
+  ['browser_navigate', 'browser_click', 'browser_type', 'browser_press', 'browser_scroll', 'browser_snapshot', 'browser_screenshot', 'browser_console', 'browser_network', 'browser_tabs', 'browser_close'],
+  ['task_board_list', 'task_board_get', 'task_board_create', 'task_board_update', 'task_board_set_parent', 'task_board_run', 'task_board_manage', 'task_board_schedule'],
 ];
 
 /** Static metadata for core categories and known plugin/MCP families. */
@@ -99,6 +102,14 @@ export const CATEGORY_ALIASES = {
   ppt: 'plugin:ppt-fusion',
   'ppt-fusion': 'plugin:ppt-fusion',
   sidebar: 'plugin:sidebar',
+  browser: 'plugin:browser',
+  image: 'plugin:image-gen',
+  images: 'plugin:image-gen',
+  canvas: 'plugin:image-gen',
+  taskboard: 'plugin:task-board',
+  'task-board': 'plugin:task-board',
+  board: 'plugin:task-board',
+  ui: 'plugin:ui',
   tavily: 'mcp:tavily',
   wincu: 'mcp:wincu',
   rea: 'mcp:rea',
@@ -158,7 +169,73 @@ export const KNOWN_PLUGIN_FAMILIES = [
     title: 'Workspace Sidebar Navigation (Sidebar)',
     summary: 'Open local files, directories, and web pages inside the workspace sidebar.',
   },
+  {
+    id: 'plugin:browser',
+    prefix: 'browser_',
+    title: 'In-Session Browser Automation (Browser)',
+    summary: 'Control browser tabs: navigate, snapshot DOM, click, type, screenshot, and inspect network/console logs.',
+  },
+  {
+    id: 'plugin:image-gen',
+    exact: new Set(['generate_image', 'generate_images', 'edit_image', 'canvas_state', 'view_canvas', 'find_inspiration']),
+    title: 'AI Image Generation & Workbench Canvas (Image Gen & Canvas)',
+    summary: 'Generate and edit images via Gemini/OpenAI/Grok, search inspiration prompts, and operate the infinite visual workbench canvas.',
+  },
+  {
+    id: 'plugin:task-board',
+    prefix: 'task_board_',
+    title: 'Task Board & Project Management (Task Board)',
+    summary: 'Manage project task board cards, subtasks, execution schedules, external outcomes, and GitHub issues/PR synchronization.',
+  },
+  {
+    id: 'plugin:ui',
+    exact: new Set(['ui_present']),
+    title: 'Interactive UI Presentation (UI)',
+    summary: 'Present self-contained interactive HTML/CSS UI cards and receive user actions in real time.',
+  },
 ];
+
+/** Recommended built-in skill companion mapping for common DSH domain workflows. */
+export const DEFAULT_SKILL_COMPANIONS = {
+  docx: ['load_workspace_dependencies', 'read', 'write', 'edit'],
+  'docx-viewer': ['read'],
+  pdf: ['load_workspace_dependencies', 'read', 'write', 'edit'],
+  'pdf-viewer': ['read'],
+  pptx: ['load_workspace_dependencies', 'read', 'write', 'edit'],
+  'pptx-viewer': ['read'],
+  xlsx: ['load_workspace_dependencies', 'read', 'write', 'edit'],
+  'xlsx-viewer': ['read'],
+  office: ['load_workspace_dependencies', 'read', 'write', 'edit'],
+  'office-docx': ['load_workspace_dependencies', 'read', 'write', 'edit'],
+  'office-pptx': ['load_workspace_dependencies', 'read', 'write', 'edit'],
+  'office-xlsx': ['load_workspace_dependencies', 'read', 'write', 'edit'],
+  'office-export-pdf': ['load_workspace_dependencies'],
+  'office-render': ['load_workspace_dependencies'],
+  'office-recalculate': ['load_workspace_dependencies'],
+  'ppt-master': ['load_workspace_dependencies', 'read', 'write', 'edit', 'generate_image'],
+  'dsh-ppt-fusion': ['dsh_ppt_preview', 'dsh_ppt_propose', 'dsh_ppt_review'],
+  'open-design-mode': ['mcp:open-design'],
+  'reverse-engineer-anything': ['mcp:rea'],
+  'control-browser': ['plugin:browser'],
+  'kimi-webbridge': ['plugin:browser'],
+  'web-gui-tester': ['plugin:browser'],
+  'tavily-search': ['mcp:tavily'],
+  'tavily-extract': ['mcp:tavily'],
+  'tavily-crawl': ['mcp:tavily'],
+  'tavily-map': ['mcp:tavily'],
+  'tavily-research': ['mcp:tavily'],
+  'tavily-cli': ['mcp:tavily'],
+  'tavily-dynamic-search': ['mcp:tavily'],
+  'tavily-best-practices': ['mcp:tavily'],
+  univer: ['plugin:univer'],
+  'univer-sheet': ['plugin:univer'],
+  'univer-doc': ['plugin:univer'],
+  'univer-slide': ['plugin:univer'],
+  'univer-board': ['plugin:univer'],
+  'univer-base': ['plugin:univer'],
+  'univer-embed': ['plugin:univer'],
+  'univer-cross-unit-formula': ['plugin:univer'],
+};
 
 /** Concise footer reminder placed at the end of directory outputs (focused on Subagent & Skill). */
 export const USAGE_REMINDER_FOOTER = [
@@ -186,7 +263,7 @@ export function createCatalogPolicy(config = {}) {
       .map(family => ({ ...family, exact: new Set(family.exact ?? []) })),
     mcpDescriptions: Object.assign(Object.create(null), config.mcpDescriptions ?? KNOWN_MCP_DESCRIPTIONS),
     companionGroups: config.companionGroups ?? COMPANION_GROUPS,
-    skillCompanions: Object.assign(Object.create(null), config.skillCompanions ?? {}),
+    skillCompanions: Object.assign(Object.create(null), config.skillCompanions ?? DEFAULT_SKILL_COMPANIONS),
     usageReminder: config.usageReminder === false ? '' : config.usageReminder ?? USAGE_REMINDER_FOOTER,
   };
 }

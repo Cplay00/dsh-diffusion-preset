@@ -71,9 +71,13 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 
 #### 常用分类别名 (Aliases)
 - `fs` → `core:file`（文件读写、搜索与工作目录）
-- `task` → `core:task`（待办任务与进度管理）
+- `task` → `core:task`（待办任务、目标与进度管理）
 - `subagent` → `core:subagent`（子智能体、并发工作流与团队编排）
 - `web` → `core:web`（网页搜索与正文提取）
+- `image` / `images` → `plugin:image-gen`（AI 生图、图片编辑与画布工作台）
+- `browser` → `plugin:browser`（会话内浏览器自动化控制）
+- `taskboard` / `board` → `plugin:task-board`（项目任务看板与 GitHub 集成）
+- `ui` → `plugin:ui`（交互式 HTML/CSS 独立卡片呈现）
 - `tavily` → `mcp:tavily`（Tavily 智能搜索与深度爬虫）
 - `rea` → `mcp:rea`（二进制逆向工程与安全分析）
 
@@ -107,7 +111,7 @@ Native 与 PTC 预设均显式声明工具呈现模式，不受宿主默认模�
 | `pluginFamilies` | 替换已知插件规则，支持 `id`、`prefix`、`exact`（名称数组）、`title`、`summary`；`[]` 清除特判。其他带下划线的工具按首段前缀分组。 |
 | `mcpDescriptions` | 替换 MCP 服务说明映射。未知服务仍按 `mcp__<server>__<tool>` 命名发现。 |
 | `companionGroups` | 替换伴随工具组；`[]` 禁用。重叠组会递归展开。 |
-| `skillCompanions` | 按技能准确名称声明工具依赖，默认 `{}`。不会根据技能名称中的 `doc`、`ppt` 等片段猜测依赖。 |
+| `skillCompanions` | 声明技能对应的工具链依赖，内置常见办公与领域技能默认映射；自定义配置整体替换。 |
 | `guide` | `false` 关闭运行时操作指引。 |
 | `usageReminder` | 自定义目录尾部提示，或用 `false` 关闭；默认提示不强制使用子智能体或技能。 |
 

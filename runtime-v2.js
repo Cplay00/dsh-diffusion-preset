@@ -10,8 +10,23 @@ const VIEW_HOOK_SYM = Symbol.for('dsh.diffusion.viewHook.v3');
 /** Format a JSON Schema parameter property for human/LLM-readable detail output. */
 function formatParameterSchema(parameters) {
   if (!parameters || typeof parameters !== 'object') return '  (No parameters)';
-  const props = parameters.properties ?? {};
+  let props = parameters.properties ?? {};
   const required = new Set(Array.isArray(parameters.required) ? parameters.required : []);
+
+  if (Object.keys(props).length === 0) {
+    const branches = parameters.oneOf ?? parameters.anyOf ?? parameters.allOf;
+    if (Array.isArray(branches)) {
+      for (const b of branches) {
+        if (b && typeof b === 'object' && b.properties) {
+          props = { ...props, ...b.properties };
+          if (Array.isArray(b.required)) {
+            for (const r of b.required) required.add(r);
+          }
+        }
+      }
+    }
+  }
+
   const keys = Object.keys(props);
   if (keys.length === 0) return '  (No parameters `{}`)';
   const lines = [];
@@ -28,6 +43,8 @@ function formatParameterSchema(parameters) {
       typeStr = `${itemType}[]`;
     } else if (Array.isArray(spec.oneOf)) {
       typeStr = 'oneOf<...>';
+    } else if (Array.isArray(spec.anyOf)) {
+      typeStr = 'anyOf<...>';
     }
     const desc = spec.description ? ` — ${String(spec.description).replace(/\s+/g, ' ').trim()}` : '';
     lines.push(`  - \`${key}\` (${typeStr}, ${isReq ? 'required' : 'optional'})${desc}`);
@@ -45,9 +62,58 @@ function formatParameterSchema(parameters) {
 }
 
 /** Dependencies are declared explicitly, never inferred from skill names. */
-function companionToolsForSkill(skillName, allToolNames, policy) {
-  return ['skill', ...normalizeTokenList(policy.skillCompanions[skillName])]
-    .filter(name => allToolNames.has(name));
+function companionToolsForSkill(skillName, allToolNames, policy, categories = new Map()) {
+  const rawList = normalizeTokenList(policy.skillCompanions[skillName]);
+  const resolvedTools = new Set(['skill']);
+  for (const token of rawList) {
+    if (allToolNames.has(token)) {
+      resolvedTools.add(token);
+      continue;
+    }
+    const lower = token.toLowerCase();
+    const resolved = policy.aliases?.[lower] ?? lower;
+    if (categories.has(resolved)) {
+      const cat = categories.get(resolved);
+      for (const t of cat.tools) resolvedTools.add(t.name);
+      continue;
+    }
+    for (const [catId, cat] of categories.entries()) {
+      if (catId === resolved || catId.endsWith(`:${resolved}`)) {
+        for (const t of cat.tools) resolvedTools.add(t.name);
+      }
+    }
+    if (resolved.startsWith('mcp:')) {
+      const srv = resolved.slice(4);
+      const prefix = `mcp__${srv.replace(/[^A-Za-z0-9_-]/g, '_')}__`;
+      for (const tName of allToolNames) {
+        if (tName.startsWith(prefix)) resolvedTools.add(tName);
+      }
+    } else if (resolved.startsWith('plugin:')) {
+      const fam = policy.pluginFamilies?.find(f => f.id === resolved);
+      if (fam?.prefix) {
+        for (const tName of allToolNames) {
+          if (tName.startsWith(fam.prefix)) resolvedTools.add(tName);
+        }
+      } else if (fam?.exact) {
+        for (const tName of fam.exact) {
+          if (allToolNames.has(tName)) resolvedTools.add(tName);
+        }
+      }
+    } else if (resolved.startsWith('core:')) {
+      const meta = policy.categories?.[resolved];
+      if (meta?.tools) {
+        for (const tName of meta.tools) {
+          if (allToolNames.has(tName)) resolvedTools.add(tName);
+        }
+      }
+    }
+    for (const tName of allToolNames) {
+      if (tName.toLowerCase() === lower || tName.toLowerCase() === resolved) {
+        resolvedTools.add(tName);
+      }
+    }
+  }
+  return [...resolvedTools].filter(name => allToolNames.has(name));
 }
 
 /** Resolve overlapping companion groups to a fixed point. */
@@ -238,8 +304,15 @@ export function apply(ctx, config = {}) {
     },
     isToolVisible(agent, toolName) {
       if (INITIAL_TOOLS.has(toolName)) return true;
-      const depth = Math.max(agent?.session?.header?.delegationDepth ?? 0, agent?.options?.subagentDepth ?? 0);
-      if (depth > 0 && toolName === 'send_message') return true;
+      if (toolName === 'send_message') {
+        const depth = Math.max(agent?.session?.header?.delegationDepth ?? 0, agent?.options?.subagentDepth ?? 0);
+        if (depth > 0) return true;
+        try {
+          if (ctx.get('agentTeams')?.tryMembership?.(agent)) return true;
+        } catch {
+          // Ignore team lookup errors
+        }
+      }
       const state = getAgentState(agent);
       if (state.excluded.has(toolName)) return false;
       if (state.unlockAll) return true;
@@ -464,9 +537,21 @@ export function apply(ctx, config = {}) {
       const resolved = CATEGORY_ALIASES[lower] ?? lower;
 
       if (lower.startsWith('skill:')) {
-        const sName = token.slice(6).trim();
-        if (skillByName.has(sName)) {
-          skillsToLoad.add(sName);
+        const rawName = token.slice(6).trim();
+        const lowerName = lower.slice(6).trim();
+        let targetSkillName;
+        if (skillByName.has(rawName)) targetSkillName = rawName;
+        else if (skillByName.has(lowerName)) targetSkillName = lowerName;
+        else {
+          for (const k of skillByName.keys()) {
+            if (k.toLowerCase() === lowerName) {
+              targetSkillName = k;
+              break;
+            }
+          }
+        }
+        if (targetSkillName) {
+          skillsToLoad.add(targetSkillName);
           continue;
         }
       }
@@ -559,7 +644,7 @@ export function apply(ctx, config = {}) {
     }
 
     for (const { name: sName } of loadedSkills) {
-      for (const comp of companionToolsForSkill(sName, allToolNames, policy)) {
+      for (const comp of companionToolsForSkill(sName, allToolNames, policy, categories)) {
         toolsToUnlock.add(comp);
       }
     }
@@ -692,11 +777,14 @@ export function apply(ctx, config = {}) {
           for (const t of cat.tools) toolsToUnload.add(t.name);
           continue;
         }
+        let matchedCategory = false;
         for (const [catId, cat] of categories) {
           if (catId.endsWith(`:${resolved}`)) {
             for (const tool of cat.tools) toolsToUnload.add(tool.name);
+            matchedCategory = true;
           }
         }
+        if (matchedCategory) continue;
         for (const tName of allToolNames) {
           const tLower = tName.toLowerCase();
           if (tLower === lower || tLower === resolved || (resolved.endsWith('*') && tLower.startsWith(resolved.slice(0, -1)))) {
@@ -916,6 +1004,7 @@ export function apply(ctx, config = {}) {
     const teamUnlocked = controller.isToolVisible(agent, 'spawn_teammate');
     const mcpResUnlocked = controller.isToolVisible(agent, 'list_mcp_resources');
     const opsDiscUnlocked = controller.isToolVisible(agent, 'ops_discover_tools');
+    const imageUnlocked = controller.isToolVisible(agent, 'generate_image');
 
     const fullVisible = viewHook.unfilteredView(agent).visible;
     const isMcpServerUnlocked = serverName => {
@@ -932,6 +1021,7 @@ export function apply(ctx, config = {}) {
       if (sec.name === 'team:policy' && !teamUnlocked) return false;
       if (sec.name === 'mcp-resource-servers' && !mcpResUnlocked) return false;
       if (sec.name.startsWith('dsh-ops:discovery-tools') && !opsDiscUnlocked) return false;
+      if (sec.name.startsWith('dsh-image-gen:') && !imageUnlocked) return false;
       if (sec.name.startsWith('mcp:')) {
         const serverName = sec.name.slice(4);
         if (!isMcpServerUnlocked(serverName)) return false;
