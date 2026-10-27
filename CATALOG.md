@@ -14,6 +14,8 @@ Start with an operation, then select only the exact capabilities needed:
 - `call_directory({ names: ["skill:<name>"] })`: load the selected skill instructions.
 - Categories and wildcards in `names` explicitly expand whole sets. Use them when the task needs that whole set.
 
+Space-separated query terms are combined with AND; translations are alternatives within each term. For example, `query: "文档 excel"` requires document and spreadsheet evidence instead of returning every generic file tool. ASCII words match word/identifier boundaries. Category filters use actual category IDs, aliases, families or exact suffixes; they do not search tool names. The live overview lists categories and counts; use lookup for candidates.
+
 ---
 
 ## 🔄 Progressive Disclosure Lifecycle (Search First Recommended)
@@ -27,7 +29,7 @@ The progressive expansion lifecycle consists of four lightweight phases:
 └─────────────────────┘     └─────────────┘     └─────────────────────┘     └─────────────────────┘
 ```
 
-> 💡 **Search First (Recommended)**: Before mounting or calling extended tools, it is strongly recommended to search dynamically installed capabilities in the current harness via `call_directory({ query: "<keyword>" })` (e.g. `query: "git"`, `query: "excel"`, `query: "browser"`, `query: "文档"`). This avoids guessing tool names and guarantees accurate one-step mounting.
+> 💡 **Search First (Recommended)**: Before mounting or calling unfamiliar capabilities, search installed tools and skills via `call_directory({ query: "<keyword>" })`, then select exact names. In PTC, run `await tools.call_directory(...)` inside `run_code`; newly mounted bindings are available in the next `run_code`.
 
 1. **Search & Lookup (`lookup`)**: `call_directory({ query: "<keyword>" })`  
    Searches specific tools or skills by keyword or category across currently installed harness tools without dumping large parameter schemas into the context.
@@ -56,7 +58,7 @@ The progressive expansion lifecycle consists of four lightweight phases:
 | `core:job` | `jobs` | Background Jobs | Inspect job output and stop jobs. |
 | `core:schedule` | `schedule` | Scheduling | Scheduled tasks. |
 | `core:web` | `web`, `search` | Web Search & Presentation | Live web searches, web page content extraction, and finished artifact presentation cards. |
-| `core:dev` | `dev`, `git` | Worktrees & Harness Management | Worktrees and Cordis/plugin management. |
+| `core:dev` | `dev`, `git` | Worktrees & Harness Management | Worktrees and inspection of harness services/plugin state. Plugin market operations belong to `plugin:market`; ops tools belong to `plugin:ops`. |
 | `core:terminal` | `terminal` | Persistent Terminals | Open, interact with and close terminals. |
 | `core:session` | `session` | Session History | Search and inspect historical events. |
 | `skills` | `skills` | Domain Skills Repository | Complete domain workflows, coding standards, and best practices (Office, design, analysis, etc.). |
@@ -76,7 +78,7 @@ Diffusion Mode dynamically discovers and organizes any external capabilities ins
 
 ## 💡 Prompt Engineering & Context Economy
 
-1. **Subagent Delegation (`subagent`)**: Inspect and unlock delegation tools when useful and permitted by the user and workspace instructions.
+1. **Adaptive Collaboration**: Stay solo for quick or tightly coupled work. Prefer bounded subagents for worthwhile independent tasks; use durable teammates as lead when sustained coordination or shared dependencies justify their cost. Choose fresh tasks or forks by context needs, reuse suitable agents and mount exact tools only. Initial guidance is brief; assignment and result-validation rules expand after collaboration tools are mounted. Assigned members retain their team identity without needing a spawn tool and do not re-delegate by default.
 2. **Domain Skills (`skills`)**: Search registered providers for relevant workflows. Skill dependencies use explicit `skillCompanions` mappings (empty by default). Domain inference requires `inferSkillCompanions: true`; no fixed installation paths are used.
 3. **Context Pruning**: When completing large milestones, call `call_directory({ action: "unload", names: [...] })` to keep the context window lean and focused.
 

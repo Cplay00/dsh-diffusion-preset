@@ -207,12 +207,18 @@ export function apply(ctx, config = {}) {
   const CATEGORY_ALIASES = policy.aliases;
   const presetScopeKey = getScopeOf(ctx);
   const isPtcMode = config?.mode === 'ptc';
+  const directoryCall = isPtcMode ? 'await tools.call_directory' : 'call_directory';
+  const teamContextTools = ['spawn_teammate', 'wait_agent', 'list_agents', 'interrupt_agent', 'team_task_create', 'team_task_get', 'team_task_list', 'team_task_update'];
   const rawTools = unwrapService(ctx.tools);
   const viewHook = ensureViewHook(rawTools);
 
   /** Per-agent unlocked state cache, backed by the durable session log. */
   const agentStates = new WeakMap();
   let disposed = false;
+
+  function teamMembership(agent) {
+    try { return ctx.get('agentTeams')?.tryMembership?.(agent); } catch { return undefined; }
+  }
 
   function getAgentState(agent) {
     let state = agentStates.get(agent);
@@ -307,11 +313,7 @@ export function apply(ctx, config = {}) {
       if (toolName === 'send_message') {
         const depth = Math.max(agent?.session?.header?.delegationDepth ?? 0, agent?.options?.subagentDepth ?? 0);
         if (depth > 0) return true;
-        try {
-          if (ctx.get('agentTeams')?.tryMembership?.(agent)) return true;
-        } catch {
-          // Ignore team lookup errors
-        }
+        if (teamMembership(agent)) return true;
       }
       const state = getAgentState(agent);
       if (state.excluded.has(toolName)) return false;
@@ -360,21 +362,15 @@ export function apply(ctx, config = {}) {
     const lines = [
       `# Diffusion Mode · Call Directory (${isPtcMode ? 'PTC Mode' : 'Standard Mode'})`,
       '',
-      `> 💡 **Search First (Recommended)**: Before mounting or calling unfamiliar capabilities, use \`call_directory({ query: "<keyword>" })\` to search dynamically installed tools and skills in this harness.`,
+      `> 💡 **Search First (Recommended)**: Before mounting or calling unfamiliar capabilities, use \`${directoryCall}({ query: "<keyword>" })\` to search dynamically installed tools and skills in this harness.`,
       '',
       `- **Currently Available Basic Tools**: ${initialList.map(t => `\`${t}\``).join(', ')}`,
       `- **Total Capabilities in Environment**: **${totalTools}** extended tools (**${unlockedCount}** unlocked) + **${skills.length}** domain skills (Skills)`,
       '',
       '## Quick Start (Exact Names)',
-      ...quickUnlockLines(inventory),
+      ...quickUnlockLines(inventory, { isPtcMode }),
       '',
-      '## 1. Progressive Disclosure Flow (Search First → Mount → Execute → Unload)',
-      '1. **Search (Recommended)**: `call_directory({ query: "<keyword>" })` — Discover exact tool & skill names installed in this harness.',
-      '2. **Catalog (`catalog`)**: `call_directory()` — Overview all currently active capability categories and shortcuts.',
-      '3. **Detail & Unlock (`detail`)**: `call_directory({ names: ["<exact name>"] })` — Mount the selected capability. Categories and wildcards explicitly mount whole sets.',
-      '4. **Dynamic Unload (`unload`)**: `call_directory({ action: "unload", names: ["<name or category>"] })` — Prune tools from context to keep it lightweight.',
-      '',
-      '## 2. Callable Capability Categories Overview',
+      '## Capability Categories',
     ];
 
     const groups = [
@@ -390,21 +386,13 @@ export function apply(ctx, config = {}) {
       lines.push('', grp.header);
       for (const cat of matchingCats) {
         if (cat.kind === 'skill') {
-          const sampleSkills = cat.skills.slice(0, 12).map(s => `\`${s.name}\``).join(', ');
-          const more = cat.skills.length > 12 ? ` and ${cat.skills.length - 12} more (${cat.skills.length} total)` : ` (${cat.skills.length} total)`;
-          lines.push(`- **\`${cat.id}\`** — **${cat.title}**${more}`);
-          lines.push(`  - Summary: ${cat.summary}`);
-          lines.push(`  - Example Skills: ${sampleSkills}`);
+          lines.push(`- **\`${cat.id}\`** (${cat.skills.length} skills) — ${cat.summary}`);
         } else {
           const uCount = cat.tools.filter(t => t.unlocked).length;
           const statusTag = uCount === cat.tools.length
             ? `✅ All Unlocked (${cat.tools.length}/${cat.tools.length})`
             : `🔒 Unlocked ${uCount}/${cat.tools.length}`;
-          const previewNames = cat.tools.slice(0, 8).map(t => `\`${t.name}\``).join(', ');
-          const more = cat.tools.length > 8 ? ` etc.` : '';
-          lines.push(`- **\`${cat.id}\`** — **${cat.title}** [${statusTag}]`);
-          lines.push(`  - Summary: ${cat.summary}`);
-          lines.push(`  - Included Tools: ${previewNames}${more}`);
+          lines.push(`- **\`${cat.id}\`** — **${cat.title}** [${statusTag}]: ${cat.summary}`);
         }
       }
     }
@@ -418,13 +406,13 @@ export function apply(ctx, config = {}) {
 /** Multilingual query synonym mapping for intelligent search across tools and skills. */
 const QUERY_SYNONYMS = {
   // Office, Files & Documents
-  '文档': ['doc', 'docx', 'document', 'word', 'office', 'univer', 'file', 'read'],
+  '文档': ['doc', 'docx', 'document', 'word', 'office', 'file', 'read'],
   '文件': ['file', 'read', 'write', 'edit', 'doc', 'document', 'code'],
-  '表格': ['sheet', 'excel', 'xlsx', 'table', 'csv', 'univer'],
+  '表格': ['sheet', 'excel', 'xlsx', 'table', 'csv'],
   '幻灯片': ['ppt', 'pptx', 'slide', 'presentation'],
   'pdf': ['pdf', 'document'],
-  'office': ['doc', 'docx', 'sheet', 'xlsx', 'ppt', 'univer'],
-  'excel': ['sheet', 'xlsx', 'spreadsheet', 'csv', 'univer'],
+  'office': ['doc', 'docx', 'sheet', 'xlsx', 'ppt'],
+  'excel': ['sheet', 'xlsx', 'spreadsheet', 'csv'],
   'word': ['doc', 'docx', 'document'],
 
   // Browsing & Web
@@ -478,13 +466,20 @@ const QUERY_SYNONYMS = {
     const maxLimit = isKeywordSearch ? 20 : 100;
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(maxLimit, Math.floor(rawLimit)) : 20;
     const rawTokens = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
-    const expandedSynonyms = new Set();
-    for (const token of rawTokens) {
-      const syns = QUERY_SYNONYMS[token];
-      if (Array.isArray(syns)) {
-        for (const s of syns) expandedSynonyms.add(s.toLowerCase());
-      }
-    }
+    // AND between query terms; OR only within one term's translations.
+    // ASCII word/identifier boundaries avoid read→thread, tab→table and ui→build.
+    const matcher = term => {
+      if (!/^[a-z0-9_:-]+$/.test(term)) return hay => hay.includes(term);
+      const plural = /^[a-z]+$/.test(term) && !term.endsWith('s') ? 's?' : '';
+      const pattern = new RegExp(`(^|[^a-z0-9])${term}${plural}(?=$|[^a-z0-9])`);
+      return hay => pattern.test(hay);
+    };
+    const terms = rawTokens.map(token => ({
+      original: matcher(token),
+      alternatives: [token, ...(Object.hasOwn(QUERY_SYNONYMS, token) ? QUERY_SYNONYMS[token] : [])].map(matcher),
+    }));
+    const searchText = text => `${text} ${text.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z])([A-Z][a-z])/g, '$1 $2')}`.toLowerCase();
+    const matchesQuery = hay => terms.every(term => term.alternatives.some(matches => matches(hay)));
 
     const matchedTools = [];
     const matchedSkills = [];
@@ -497,26 +492,22 @@ const QUERY_SYNONYMS = {
       const catMatch =
         includeAllCats ||
         tool.category.toLowerCase() === rawCat ||
-        tool.category.toLowerCase().includes(rawCat) ||
-        tool.name.toLowerCase().includes(rawCat);
+        tool.category.toLowerCase().split(':')[0] === rawCat ||
+        tool.category.toLowerCase().split(':').slice(1).join(':') === rawCat;
       if (!catMatch) continue;
       if (rawTokens.length > 0) {
-        const hay = `${tool.name} ${tool.category} ${tool.description}`.toLowerCase();
-        const matchesOriginal = rawTokens.every(kw => hay.includes(kw));
-        const matchesSynonym = [...expandedSynonyms].some(s => hay.includes(s));
-        if (!matchesOriginal && !matchesSynonym) continue;
+        const hay = searchText(`${tool.name} ${tool.category} ${tool.description}`);
+        if (!matchesQuery(hay)) continue;
       }
       matchedTools.push(tool);
     }
 
-    if (wantSkillsCat || rawTokens.length > 0) {
+    if (wantSkillsCat) {
       for (const skill of skills) {
-        if (!wantSkillsCat && rawCat && !skill.name.toLowerCase().includes(rawCat)) continue;
+        if (rawCat.startsWith('skill:') && skill.name.toLowerCase() !== rawCat.slice(6)) continue;
         if (rawTokens.length > 0) {
-          const hay = `${skill.name} ${skill.description}`.toLowerCase();
-          const matchesOriginal = rawTokens.every(kw => hay.includes(kw));
-          const matchesSynonym = [...expandedSynonyms].some(s => hay.includes(s));
-          if (!matchesOriginal && !matchesSynonym) continue;
+          const hay = searchText(`${skill.name} ${skill.description}`);
+          if (!matchesQuery(hay)) continue;
         }
         matchedSkills.push(skill);
       }
@@ -526,11 +517,13 @@ const QUERY_SYNONYMS = {
       const nLower = item.name.toLowerCase();
       if (nLower === rawQuery) return 0;
       if (rawQuery && nLower.startsWith(rawQuery)) return 1;
-      if (rawTokens.length > 0 && rawTokens.every(kw => nLower.includes(kw))) return 2;
+      if (!terms.length) return 6;
+      const nameText = searchText(item.name);
+      if (terms.every(term => term.original(nameText))) return 2;
       const catLower = (item.category || '').toLowerCase();
-      if (rawTokens.length > 0 && rawTokens.every(kw => catLower.includes(kw))) return 3;
-      if ([...expandedSynonyms].some(s => nLower.includes(s))) return 4;
-      if ([...expandedSynonyms].some(s => catLower.includes(s))) return 5;
+      if (terms.every(term => term.original(searchText(`${item.name} ${catLower} ${item.description}`)))) return 3;
+      if (matchesQuery(nameText)) return 4;
+      if (matchesQuery(`${nameText} ${catLower}`)) return 5;
       return 6;
     };
     const matches = [
@@ -551,7 +544,7 @@ const QUERY_SYNONYMS = {
       lines.push(
         '',
         'No matching items found. Suggestions:',
-        '- Call `call_directory()` to inspect all available category IDs and recommended shortcuts.',
+        `- Call \`${directoryCall}()\` to inspect all available category IDs and recommended shortcuts.`,
         '- Try a shorter or more general search query.'
       );
       return lines.join('\n');
@@ -569,7 +562,7 @@ const QUERY_SYNONYMS = {
 
       if (offset + page.length < matches.length) {
         const nextPage = { action: 'lookup', ...(args.category ? { category: args.category } : {}), ...(args.query ? { query: args.query } : {}), offset: offset + limit, limit };
-        lines.push('', `- Next page (lookup only): \`call_directory(${JSON.stringify(nextPage)})\`.`);
+        lines.push('', `- Next page (lookup only): \`${directoryCall}(${JSON.stringify(nextPage)})\`.`);
       }
     }
 
@@ -578,9 +571,9 @@ const QUERY_SYNONYMS = {
     lines.push(
       '',
       '## Next Step: Mount Directly',
-      `- Select only the exact capability needed, e.g. \`call_directory({ names: [${JSON.stringify(target)}] })\`.`,
+      `- Select only the exact capability needed, e.g. \`${directoryCall}({ names: [${JSON.stringify(target)}] })\`.`,
       '- Search results are candidates, not a batch mount request.',
-      '> 💡 **Search First (Recommended)**: You can query other keywords anytime via `call_directory({ query: "<keyword>" })` before mounting.'
+      `> 💡 **Search First (Recommended)**: You can query other keywords anytime via \`${directoryCall}({ query: "<keyword>" })\` before mounting.`
     );
 
     return lines.join('\n');
@@ -593,7 +586,7 @@ const QUERY_SYNONYMS = {
     const skillByName = new Map(skills.map(s => [s.name, s]));
 
     const requestedTokens = normalizeTokenList(args.names);
-    if (typeof args.category === 'string' && args.category.trim()) {
+    if (requestedTokens.length === 0 && typeof args.category === 'string' && args.category.trim()) {
       requestedTokens.push(args.category.trim());
     }
     if (requestedTokens.length === 0) {
@@ -603,6 +596,7 @@ const QUERY_SYNONYMS = {
     const toolsToUnlock = new Set();
     const skillsToLoad = new Set();
     const unmatched = [];
+    const ambiguous = [];
     let unlockAll = false;
 
     for (const token of requestedTokens) {
@@ -665,18 +659,15 @@ const QUERY_SYNONYMS = {
         continue;
       }
 
-      let matchedCategory = false;
-      for (const [catId, cat] of categories.entries()) {
-        if (catId === resolved || catId.endsWith(`:${resolved}`)) {
-          if (cat.kind === 'skill') {
-            if (allToolNames.has('skill')) toolsToUnlock.add('skill');
-          } else {
-            for (const t of cat.tools) toolsToUnlock.add(t.name);
-          }
-          matchedCategory = true;
-        }
+      const suffixCategories = [...categories.values()].filter(cat => cat.id.endsWith(`:${resolved}`));
+      if (suffixCategories.length > 1) {
+        ambiguous.push({ token, categories: suffixCategories });
+        continue;
       }
-      if (matchedCategory) continue;
+      if (suffixCategories.length === 1) {
+        for (const tool of suffixCategories[0].tools) toolsToUnlock.add(tool.name);
+        continue;
+      }
 
       const prefix = resolved.endsWith('*') ? resolved.slice(0, -1) : resolved;
       let matchedAny = false;
@@ -755,6 +746,7 @@ const QUERY_SYNONYMS = {
 
     const lines = [
       `# Call Directory · Mount Results`,
+      ...ambiguous.map(({ token, categories }) => ambiguousCategoryMessage(token, categories)),
     ];
 
     if (unlockAll) {
@@ -780,7 +772,7 @@ const QUERY_SYNONYMS = {
     if (unmatched.length > 0) {
       lines.push(
         '',
-        `⚠️ **The following names were not found**: ${unmatched.map(u => `\`${u}\``).join(', ')}. 💡 **Recommendation**: Before calling, search currently installed capabilities via \`call_directory({ query: "<keyword>" })\`.`
+        `⚠️ **The following names were not found**: ${unmatched.map(u => `\`${u}\``).join(', ')}. 💡 **Recommendation**: Before calling, search currently installed capabilities via \`${directoryCall}({ query: "<keyword>" })\`.`
       );
     }
 
@@ -829,17 +821,22 @@ const QUERY_SYNONYMS = {
     };
   }
 
+  function ambiguousCategoryMessage(token, categories) {
+    return `⚠️ Ambiguous category suffix \`${token}\`: ${categories.map(cat => `\`${cat.id}\``).join(', ')}. Supply a full category ID; no tools changed for this token.`;
+  }
+
   /** Stage 4: Unload specific tools or reset the session back to minimal mode to prune context. */
   async function executeUnload(inventory, args, agent) {
     const { allToolsMap, categories } = inventory;
     const allToolNames = new Set(allToolsMap.keys());
     const requestedTokens = normalizeTokenList(args.names || args.unload);
-    if (typeof args.category === 'string' && args.category.trim()) {
+    if (requestedTokens.length === 0 && typeof args.category === 'string' && args.category.trim()) {
       requestedTokens.push(args.category.trim());
     }
 
     const isReset = args.action === 'reset' || requestedTokens.some(token => token === '*' || token.toLowerCase() === 'all');
     const toolsToUnload = new Set();
+    const ambiguous = [];
 
     if (!isReset) {
       for (const token of requestedTokens) {
@@ -858,14 +855,15 @@ const QUERY_SYNONYMS = {
           for (const t of cat.tools) toolsToUnload.add(t.name);
           continue;
         }
-        let matchedCategory = false;
-        for (const [catId, cat] of categories) {
-          if (catId.endsWith(`:${resolved}`)) {
-            for (const tool of cat.tools) toolsToUnload.add(tool.name);
-            matchedCategory = true;
-          }
+        const suffixCategories = [...categories.values()].filter(cat => cat.id.endsWith(`:${resolved}`));
+        if (suffixCategories.length > 1) {
+          ambiguous.push({ token, categories: suffixCategories });
+          continue;
         }
-        if (matchedCategory) continue;
+        if (suffixCategories.length === 1) {
+          for (const tool of suffixCategories[0].tools) toolsToUnload.add(tool.name);
+          continue;
+        }
         for (const tName of allToolNames) {
           const tLower = tName.toLowerCase();
           if (tLower === lower || tLower === resolved || (resolved.endsWith('*') && tLower.startsWith(resolved.slice(0, -1)))) {
@@ -906,6 +904,7 @@ const QUERY_SYNONYMS = {
 
     const lines = [
       '# Call Directory · Dynamic Unload Results',
+      ...ambiguous.map(({ token, categories }) => ambiguousCategoryMessage(token, categories)),
       '',
       isReset
         ? '🔄 **Current session has been reset to the minimal initial state** (only basic tools retained).'
@@ -913,7 +912,7 @@ const QUERY_SYNONYMS = {
           ? `🔻 **Successfully unloaded tools (${unloadedRecord.length})**: ${unloadedRecord.map(t => `\`${t}\``).join(', ')}`
           : '⚠️ **No matching tools found to unload** (they may not have been unlocked or names did not match).',
       '',
-      '> 💡 Note: Unloaded tools can be re-mounted at any time via `call_directory({ names: [...] })`.',
+      `> 💡 Note: Unloaded tools can be re-mounted at any time via \`${directoryCall}({ names: [...] })\`.`,
     ];
 
     return {
@@ -943,12 +942,12 @@ const QUERY_SYNONYMS = {
         category: {
           type: 'string',
           description:
-            'Category ID or alias (e.g. "core:file" or "fs", "task", "subagent", "skills", "tavily", "rea", etc.).',
+            'Category ID, alias, family or full suffix for lookup. With detail/unload, selects a whole category only when names is absent; explicit names take precedence.',
         },
         query: {
           type: 'string',
           description:
-            'Search keyword (case-insensitive, matched against tool names, skill names, MCP server names, and descriptions).',
+            'Case-insensitive search of names, categories and descriptions. Space-separated terms must all match; each term may match its synonyms. Lookup never mounts capabilities.',
         },
         offset: {
           type: 'integer',
@@ -960,7 +959,7 @@ const QUERY_SYNONYMS = {
         },
         names: {
           description:
-            'Exact tool/skill names to mount or unload (e.g. ["read", "grep"]). Category aliases and wildcards mount whole sets; prefer category/query lookup before selecting exact names.',
+            'Exact tool/skill names to mount or unload (e.g. ["read", "grep"]); takes precedence over category. Category aliases and wildcards explicitly mount whole sets. A category suffix must be unique; otherwise use its full ID.',
           oneOf: [
             { type: 'array', items: { type: 'string' } },
             { type: 'string' },
@@ -1056,22 +1055,55 @@ const QUERY_SYNONYMS = {
     },
   });
 
+  function collaborationGuidance(agent) {
+    if (agent && !controller.ownsAgent(agent)) return [];
+    const available = viewHook.unfilteredView(agent).visible;
+    const membership = teamMembership(agent);
+    const participant = membership && membership.role !== 'lead';
+    const assigned = participant || Math.max(agent?.session?.header?.delegationDepth ?? 0, agent?.options?.subagentDepth ?? 0) > 0;
+    const isVisible = name => Boolean(agent && controller.isToolVisible(agent, name));
+    const launchers = ['subagent', 'subagent_fork'].filter(name => available.has(name));
+    const canStartTeam = !assigned && available.has('spawn_teammate') && (!membership || membership.role === 'lead');
+    const coordinating = teamContextTools.some(name => available.has(name) && isVisible(name));
+    if (!launchers.length && !canStartTeam && !assigned && !coordinating) return [];
+    const lines = [
+      '',
+      '## Adaptive Collaboration',
+      '- **Choose by benefit**: Follow user/workspace rules and permissions. Stay solo for quick, serial or tightly coupled work. Delegate independent work when saved time, context or independent verification outweighs startup and coordination cost.',
+    ];
+    if (assigned) lines.push('- **Assigned member**: Complete your bounded assignment and report evidence to the requesting agent. Do not create teammates or re-delegate by default; subdivide only when explicitly allowed and useful.');
+    if (launchers.length) {
+      const choices = [];
+      if (available.has('subagent')) choices.push('`subagent` for a self-contained brief in a fresh context');
+      if (available.has('subagent_fork')) choices.push(available.has('subagent') ? '`subagent_fork` when completed conversation history is needed' : '`subagent_fork` as the available launcher, with a complete brief for this task');
+      lines.push(`- **Bounded delegation**: Choose ${choices.join('; or ')}. Mount only the chosen launcher with \`${directoryCall}({ names: ["<chosen exact name>"] })\`. Dispatch once scope and inputs are sufficient; do not pre-solve the delegated task. Follow its reporting contract: Team-only roster/wait tools do not track independent subagents.`);
+    }
+    if (canStartTeam) lines.push('- **Durable team**: As lead, choose `spawn_teammate` for sustained parallel responsibilities needing repeated coordination or shared task dependencies. Reuse suitable agents, start the smallest useful team, and mount waiting/task-board tools only as needed.');
+    if (assigned || coordinating || launchers.some(isVisible)) lines.push(
+      '- **Assignment contract**: State goal, scope, inputs, deliverable and acceptance evidence, including current-turn requirements a fork cannot inherit. Preserve read-only/approval constraints; give writers disjoint ownership or serialize overlapping edits. Avoid duplicate work and recursive spawning without a distinct benefit.',
+      '- **Close the loop**: Advance independent parent work while agents run. Use completion notifications; wait only when blocked, without polling. Inactive is not a verified result: treat reports as claims, verify evidence and integrate outputs. Use only controls whose registered scope covers that agent; prune tools after no active work needs them.',
+    );
+    return lines;
+  }
+
   // Register Diffusion Mode prompt section
   if (config.guide !== false) ctx.systemPrompt.section({
     name: 'diffusion:guide',
     order: 700,
     interpolate: false,
-    text: () =>
+    text: context =>
       [
         `# Diffusion Mode (${isPtcMode ? 'PTC Edition' : 'Standard Edition'}) · Progressive Workflow`,
         '',
         'The current session runs in **Diffusion Mode**, starting with minimal essential tools and progressively expanding on demand to keep context lean and focused.',
         '',
         '## ⚡ Operating Guidelines (Search First Recommended)',
-        '1. **Search First (Recommended)**: Reuse tools already available. Search a concrete operation with `call_directory({ query: "<operation>" })`. Inspect available categories with `call_directory()`; `call_directory({ category: "<id>" })` lists candidates without mounting.',
-        '2. **Mount Exact Names**: Select only the tool or skill needed for the next action: `call_directory({ names: ["<exact name>"] })`. Do not mount search results as a batch. Categories and wildcards in names mount whole sets; use them only when the task requires that whole set.',
-        isPtcMode ? '3. **Execute**: Use `await tools.<name>(args)` inside `run_code`; mounting exposes SDK bindings, not additional top-level model tools.' : '3. **Execute**: Invoke the mounted native tool directly. Mounting makes a tool available; it does not execute it.',
-        '4. **Prune**: Unload tools no longer needed with `call_directory({ action: "unload", names: [...] })` or reset with `{ action: "reset" }`.',
+        `1. **Search First (Recommended)**: Reuse available tools and exact names already verified in this session. For an unknown capability, search a concrete operation with \`${directoryCall}({ query: "<operation>" })\`; combine terms to narrow results. Inspect available categories with \`${directoryCall}()\`; \`${directoryCall}({ category: "<id>" })\` lists candidates without mounting.`,
+        `2. **Mount Exact Names**: Select only the tool or skill needed for the next action: \`${directoryCall}({ names: ["<exact name>"] })\`. Do not mount search results as a batch. Categories and wildcards in names mount whole sets; use them only when the task requires that whole set.`,
+        isPtcMode ? '3. **Execute via SDK**: Run the directory snippets above inside `run_code`. Discover and mount SDK capabilities for supported operations, including file reads/searches, before substituting raw filesystem or shell APIs. Use `await tools.<name>(args)` in the next `run_code` after mounting. Use JavaScript for batching independent calls, transforming data and operations without a suitable SDK tool; print only relevant results.' : '3. **Execute**: Invoke mounted native tools directly; batch independent reads when supported. Mounting makes a tool available; it does not execute it.',
+        '4. **Focus**: Search for locations before reading large files, then read relevant ranges. Avoid repeated whole-file reads and stop inspecting when evidence is sufficient for the requested task.',
+        `5. **Prune**: At phase completion, unload tools no longer needed with \`${directoryCall}({ action: "unload", names: [...] })\` or reset with \`${directoryCall}({ action: "reset" })\`.`,
+        ...collaborationGuidance(context?.scope),
       ].join('\n'),
   });
 
@@ -1081,7 +1113,10 @@ const QUERY_SYNONYMS = {
     const agent = context?.scope;
     if (!controller.ownsAgent(agent)) return result;
 
-    const teamUnlocked = controller.isToolVisible(agent, 'spawn_teammate');
+    const membership = teamMembership(agent);
+    const fullVisible = viewHook.unfilteredView(agent).visible;
+    const teamUnlocked = Boolean(membership && membership.role !== 'lead') ||
+      teamContextTools.some(name => fullVisible.has(name) && controller.isToolVisible(agent, name));
     const mcpResUnlocked = controller.isToolVisible(agent, 'list_mcp_resources');
     const opsDiscUnlocked = controller.isToolVisible(agent, 'ops_discover_tools');
     const imageUnlocked = controller.isToolVisible(agent, 'generate_image');
@@ -1090,7 +1125,6 @@ const QUERY_SYNONYMS = {
     const memoryUnlocked = controller.isToolVisible(agent, 'openviking_search') || controller.isToolVisible(agent, 'memory_store');
     const computerUseUnlocked = controller.isToolVisible(agent, 'windows_computer_use_click') || controller.isToolVisible(agent, 'mcp__wincu__windows_computer_use_click');
 
-    const fullVisible = viewHook.unfilteredView(agent).visible;
     const isMcpServerUnlocked = serverName => {
       const normalized = `mcp__${String(serverName).replace(/[^A-Za-z0-9_-]/g, '_')}__`;
       for (const tName of fullVisible.keys()) {
@@ -1152,7 +1186,7 @@ const QUERY_SYNONYMS = {
       }
 
       const family = classifyTool(toolName, policy);
-      const msg = `Diffusion Mode Guard: Tool "${toolName}" is installed in this harness (${family}) but is currently locked to preserve context budget.\n💡 Recommendation: Search capabilities with \`call_directory({ query: "${toolName}" })\`, or mount directly with \`call_directory({ names: [${JSON.stringify(toolName)}] })\`.`;
+      const msg = `Diffusion Mode Guard: Tool "${toolName}" is installed in this harness (${family}) but is currently locked to preserve context budget.\n💡 Recommendation: Search capabilities with \`${directoryCall}({ query: "${toolName}" })\`, or mount directly with \`${directoryCall}({ names: [${JSON.stringify(toolName)}] })\`.`;
       return {
         kind: 'deny',
         reason: msg,
@@ -1174,7 +1208,7 @@ const QUERY_SYNONYMS = {
       !controller.isToolVisible(agent, toolName) &&
       viewHook.unfilteredView(agent).visible.has(toolName)
     ) {
-      const msg = `Error: Tool "${toolName}" exists in this harness but is currently locked in Diffusion Mode. Recommendation: Search installed capabilities first via \`call_directory({ query: "${toolName}" })\` or call \`call_directory({ names: [${JSON.stringify(toolName)}] })\` to unlock it.`;
+      const msg = `Error: Tool "${toolName}" exists in this harness but is currently locked in Diffusion Mode. Recommendation: Search installed capabilities first via \`${directoryCall}({ query: "${toolName}" })\` or call \`${directoryCall}({ names: [${JSON.stringify(toolName)}] })\` to unlock it.`;
       return {
         kind: 'block',
         feedback: [{ type: 'text', text: msg }],

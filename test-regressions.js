@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { apply } from './runtime-v2.js';
 import { apply as legacyApply } from './runtime.js';
 import { apply as applyHost } from './index.js';
-import { buildCompleteInventory, createCatalogPolicy, renderCatalogMarkdown } from './catalog-builder.js';
+import { buildCompleteInventory, classifyTool, createCatalogPolicy, renderCatalogMarkdown } from './catalog-builder.js';
 
 function harness(t, config = {}, options = {}) {
   const definitions = new Map((options.names ?? ['bash', 'read', 'write', 'edit', 'skill'])
@@ -150,6 +150,85 @@ test('lookup pagination gracefully sanitizes parameters without hard errors and 
   assert.deepEqual(result.unlocked, []);
 });
 
+for (const mode of ['native', 'ptc']) {
+  test(`${mode}: exact selections override category context and ambiguous suffixes never change groups`, async t => {
+    const h = harness(t, { mode }, { names: ['read', 'write', 'edit', 'working_directory', 'mcp__vendor__query', 'vendor_fetch'] });
+    const agent = h.agent();
+    assert.deepEqual((await h.call(agent, { names: ['read'], category: 'fs' })).unlocked, ['read']);
+    assert.deepEqual((await h.call(agent, { names: ['missing'], category: 'fs' })).unlocked, []);
+    await h.call(agent, { action: 'reset' });
+    assert.equal((await h.call(agent, { action: 'detail', category: 'fs' })).unlocked.length, 4, 'explicit category-only detail remains supported');
+    assert.deepEqual((await h.call(agent, { action: 'unload', names: ['read'], category: 'fs' })).unloaded, ['read']);
+    assert(h.visible(agent).includes('write'));
+    await h.call(agent, { action: 'reset' });
+    const mount = await h.call(agent, { names: ['vendor'] });
+    assert.deepEqual(mount.unlocked, []);
+    assert.match(mount.report, /Ambiguous category suffix.*mcp:vendor.*plugin:vendor/);
+    assert.deepEqual((await h.call(agent, { names: ['plugin:vendor'] })).unlocked, ['vendor_fetch']);
+    const unload = await h.call(agent, { action: 'unload', names: ['vendor'] });
+    assert.deepEqual(unload.unloaded, []);
+    assert.match(unload.report, /Supply a full category ID/);
+    assert(h.visible(agent).includes('vendor_fetch'));
+    assert.deepEqual((await h.call(agent, { names: ['mcp:vendor'] })).unlocked, ['mcp__vendor__query']);
+  });
+
+  test(`${mode}: compound lookups require every term, rank direct evidence and keep discovery read-only`, async t => {
+    const h = harness(t, { mode }, { names: ['read', 'readFile', 'threadList', 'excel_cells', 'univer_doc', 'thread_list', 'browser_table', 'mcp__rea__inspect', 'build_project'] });
+    h.definitions.get('read').description = 'Read a plain text file';
+    h.definitions.get('excel_cells').description = 'Read Excel worksheet cells';
+    h.definitions.get('univer_doc').description = 'Edit Word documents';
+    h.skillDefs.set('excel-review', { name: 'excel-review', description: 'Review Excel documents' });
+    h.skillDefs.set('browser-notes', { name: 'browser-notes', description: 'Read browser page notes' });
+    const skillLoads = t.mock.method(h.ctx.skills, 'get');
+    const agent = h.agent();
+    const before = h.visible(agent);
+    const names = report => [...report.matchAll(/^- `([^`]+)` \[(?:Locked|Unlocked|Skill)\]/gm)].map(m => m[1]);
+    const lookup = args => h.call(agent, args).then(result => names(result.report));
+
+    assert.deepEqual(new Set(await lookup({ query: '文档 excel' })), new Set(['excel-review', 'excel_cells']));
+    assert.deepEqual(await lookup({ query: '文档 missing_operation' }), [], 'untranslated terms must also constrain results');
+    assert.deepEqual(await lookup({ query: '文档 excel missing_operation' }), []);
+    assert.deepEqual(await lookup({ query: 'read' }), ['read', 'readFile', 'browser-notes', 'excel_cells'], 'camelCase segments are searchable; thread is not a read operation');
+    assert.deepEqual(await lookup({ query: '逆向' }), ['mcp__rea__inspect'], 'rea must not match read');
+    assert.deepEqual(await lookup({ query: '设计' }), [], 'ui must not match build');
+    assert.deepEqual(await lookup({ query: 'constructor' }), []);
+    assert.deepEqual(await lookup({ category: 'core:file', query: 'read' }), ['read'], 'category cannot leak matching skills');
+    assert.deepEqual(await lookup({ category: 'core:fil' }), [], 'qualified category IDs are exact');
+    assert.deepEqual(await lookup({ category: 'skill:excel-review' }), ['excel-review']);
+    assert.deepEqual(await lookup({ category: 'core:session' }), [], 'category is not a tool name substring');
+    assert.equal(skillLoads.mock.calls.length, 0);
+    assert.deepEqual(h.visible(agent), before);
+  });
+
+  test(`${mode}: catalog stays an overview and category lookup retains all candidates`, async t => {
+    const h = harness(t, { mode }, { names: Array.from({ length: 80 }, (_, i) => `vendor_operation_${i}`) });
+    const agent = h.agent();
+    const catalog = await h.call(agent);
+    assert.match(catalog.report, /plugin:vendor/);
+    assert.doesNotMatch(catalog.report, /Included Tools:|Example Skills:|vendor_operation_79/);
+    const lookup = await h.call(agent, { category: 'plugin:vendor', limit: 100 });
+    assert.match(lookup.report, /vendor_operation_79/);
+    assert.equal((lookup.report.match(/^- `vendor_operation_/gm) ?? []).length, 80);
+    const paged = await h.call(agent, { query: 'operation' });
+    for (const text of [catalog.report, lookup.report, paged.report, h.ctx.guide.text()]) {
+      if (mode === 'ptc') {
+        assert.match(text, /await tools\.call_directory\(/);
+        assert.doesNotMatch(text, /(?<!tools\.)call_directory\(/, 'PTC snippets must use the SDK namespace');
+      } else assert.doesNotMatch(text, /await tools\.call_directory\(/);
+    }
+    assert.deepEqual(h.visible(agent), ['call_directory']);
+  });
+}
+
+test('default core declarations agree with effective classification and plugin categories remain explicit', () => {
+  const policy = createCatalogPolicy();
+  for (const [category, meta] of Object.entries(policy.categories)) {
+    for (const name of meta.tools) assert.equal(classifyTool(name, policy), category, name);
+  }
+  for (const name of ['plugin_manager', 'plugin_market']) assert.equal(classifyTool(name, policy), 'plugin:market');
+  for (const name of ['ops_read_files', 'ops_discover_tools']) assert.equal(classifyTool(name, policy), 'plugin:ops');
+});
+
 test('search keywords do not mount implicitly while category names and aliases expand cleanly', async t => {
   const h = harness(t, {}, { names: Array.from({ length: 40 }, (_, i) => `mcp__vendor__read_${i}`) });
   const agent = h.agent();
@@ -194,8 +273,10 @@ test('inventories and unlocks stay within the requesting agent scope', async t =
   h.skillDefs.set('private-skill', { name: 'private-skill', description: 'Private', scope: a });
   await h.call(a, { names: ['write'] });
   assert(!h.visible(b).includes('write'));
-  assert.match((await h.call(a)).report, /private_tool/);
-  assert.doesNotMatch((await h.call(b)).report, /private_tool|private-skill/);
+  assert.match((await h.call(a)).report, /plugin:private/);
+  assert.doesNotMatch((await h.call(b)).report, /plugin:private/);
+  assert.match((await h.call(a, { query: 'private' })).report, /private_tool/);
+  assert.doesNotMatch((await h.call(b, { query: 'private' })).report, /private_tool|private-skill/);
   const global = await buildCompleteInventory(h.ctx);
   assert(!global.allToolsMap.has('private_tool'), 'host inventory must not merge an arbitrary sample agent');
 });
@@ -477,6 +558,66 @@ test('MCP, team, and image prompt sections follow actual tool visibility', async
   await h.call(agent, { action: 'unload', names: ['spawn_teammate'] });
   assert(!(await assemble()).sections.some(s => s.name === 'team:policy'));
   assert.equal((await assemble()).contexts.length, 0);
+});
+
+for (const mode of ['native', 'ptc']) {
+  test(`${mode}: collaboration guidance adapts to scoped capabilities and expands only after exact mounting`, async t => {
+    const h = harness(t, { mode }, { names: ['read'], scoped: true });
+    const a = h.agent(), b = h.agent();
+    const guide = agent => h.ctx.guide.text({ scope: agent });
+    assert.doesNotMatch(guide(a), /Adaptive Collaboration/);
+    h.extras.set(a, new Map(['subagent', 'subagent_fork', 'spawn_teammate', 'wait_agent'].map(name => [name, { name, description: name }])));
+    const initial = h.visible(a);
+    assert.match(guide(a), /Adaptive Collaboration/);
+    assert.match(guide(a), /Stay solo.*serial or tightly coupled/);
+    assert.match(guide(a), /subagent_fork.*completed conversation/);
+    assert.match(guide(a), /Durable team.*sustained parallel/);
+    assert.doesNotMatch(guide(a), /Assignment contract|Close the loop/);
+    assert.doesNotMatch(guide(b), /Adaptive Collaboration/);
+    assert.deepEqual(h.visible(a), initial, 'strategy advice must not mount any tools');
+    assert.deepEqual((await h.call(a, { names: ['subagent'] })).unlocked, ['subagent']);
+    assert.match(guide(a), /Assignment contract.*read-only\/approval/);
+    assert.match(guide(a), /Inactive is not a verified result/);
+    assert(!h.visible(a).includes('spawn_teammate'));
+    await h.call(a, { action: 'reset' });
+    assert.doesNotMatch(guide(a), /Assignment contract|Close the loop/);
+    h.extras.delete(a);
+    assert.doesNotMatch(guide(a), /Adaptive Collaboration/, 'removed providers must not leave stale launcher advice');
+  });
+}
+
+test('team policy follows coordination tools and assigned role, without requiring a spawn tool', async t => {
+  const h = harness(t, {}, { names: ['subagent', 'spawn_teammate', 'wait_agent', 'send_message'] });
+  const lead = h.agent(), member = h.agent();
+  const get = h.ctx.get;
+  h.ctx.get = name => name === 'agentTeams' ? { tryMembership: agent => ({ role: agent === member ? 'teammate' : 'lead' }) } : get(name);
+  const original = { sections: [{ name: 'team:policy' }, { name: 'user' }], contexts: [{ name: 'team:identity' }] };
+  const assemble = agent => h.hooks.get('system-prompt/assemble')[0](null, { scope: agent }, async () => original);
+  assert.deepEqual((await assemble(lead)).sections, [{ name: 'user' }], 'automatic send_message access must not expose the full team policy');
+  assert.deepEqual(await assemble(member), original, 'an assigned teammate needs identity and rules even with spawn locked');
+  const memberGuide = h.ctx.guide.text({ scope: member });
+  assert.match(memberGuide, /Assigned member.*Do not create teammates or re-delegate by default/);
+  assert.doesNotMatch(memberGuide, /Durable team/);
+  await h.call(lead, { names: ['wait_agent'] });
+  assert.deepEqual(await assemble(lead), original, 'waiting and coordination still need the team context');
+  assert(!h.visible(lead).includes('spawn_teammate'));
+  await h.call(lead, { action: 'unload', names: ['wait_agent'] });
+  assert.deepEqual((await assemble(lead)).contexts, []);
+  assert.deepEqual(await assemble(member), original);
+});
+
+test('delegated children remain bounded without a Team service and fork-only hosts keep an actionable strategy', t => {
+  const h = harness(t, {}, { names: ['subagent_fork', 'spawn_teammate'] });
+  const child = h.agent();
+  child.session.header.delegationDepth = 1;
+  const guide = h.ctx.guide.text({ scope: child });
+  assert.match(guide, /Assigned member/);
+  assert.match(guide, /subagent_fork.*available launcher.*complete brief/);
+  assert.match(guide, /do not pre-solve the delegated task/);
+  assert.match(guide, /Team-only roster\/wait tools do not track independent subagents/);
+  assert.match(guide, /registered scope covers that agent/);
+  assert.doesNotMatch(guide, /Durable team/);
+  assert.deepEqual(h.visible(child), ['call_directory']);
 });
 
 test('image and browser categories expand explicitly while exact names stay exact', async t => {

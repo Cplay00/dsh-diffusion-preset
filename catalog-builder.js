@@ -19,23 +19,23 @@ export const CATEGORY_META = {
   'core:file': {
     title: 'File Operations',
     summary: 'Read, write and edit files; select the working directory.',
-    tools: new Set(['read', 'write', 'edit', 'working_directory', 'ops_read_files']),
+    tools: new Set(['read', 'write', 'edit', 'working_directory']),
   },
   'core:search': {
     title: 'File & Code Search',
     summary: 'Find files and search code without mounting file mutation tools.',
-    tools: new Set(['glob', 'grep', 'ops_discover_tools']),
+    tools: new Set(['glob', 'grep']),
   },
   'core:subagent': {
-    title: 'Subagent Delegation',
-    summary: 'Start or fork subagents and control their execution. Team task boards and workflows are separate.',
+    title: 'Subagents & Agent Control',
+    summary: 'Start or fork bounded agents; control scope follows each registered tool schema. Team-only controls do not track independent subagents.',
     tools: new Set([
       'subagent', 'subagent_fork', 'send_message', 'interrupt_agent', 'list_agents',
     ]),
   },
   'core:team': {
     title: 'Agent Teams',
-    summary: 'Start teammates, wait for them, and manage shared team tasks.',
+    summary: 'Start durable teammates, wait for Team changes, and manage shared team tasks.',
     tools: new Set([
       'spawn_teammate', 'wait_agent', 'team_task_create', 'team_task_get', 'team_task_list', 'team_task_update',
     ]),
@@ -77,8 +77,8 @@ export const CATEGORY_META = {
   },
   'core:dev': {
     title: 'Worktrees & Harness Management',
-    summary: 'Create worktrees and inspect or manage the harness and its plugins.',
-    tools: new Set(['create_worktree', 'cordis_inspect_list', 'cordis_inspect_query', 'plugin_manager', 'plugin_market']),
+    summary: 'Create worktrees and inspect harness services and plugin state.',
+    tools: new Set(['create_worktree', 'cordis_inspect_list', 'cordis_inspect_query']),
   },
   'core:terminal': {
     title: 'Persistent Terminals',
@@ -400,7 +400,7 @@ export const DEFAULT_SKILL_COMPANIONS = {};
 export const USAGE_REMINDER_FOOTER = [
   '---',
   '### 💡 Capability Guidance (Subagents & Skills)',
-  '1. **Subagents**: When delegation is useful and available, inspect the corresponding category before unlocking tools.',
+  '1. **Collaboration**: Stay solo for small or dependent work; use available subagents for worthwhile independent work and durable teams for sustained coordination. Follow user/workspace rules, select exact tools and verify returned evidence.',
   '2. **Domain Skills**: Search registered skills for relevant workflows and follow the user and workspace instructions.',
 ].join('\n');
 
@@ -450,12 +450,14 @@ export function firstLineSummary(text, maxLen = 140) {
 }
 
 /** Recommend scenario-based shortcuts and installed categories in this inventory. */
-export function quickUnlockLines(inventory) {
+export function quickUnlockLines(inventory, { isPtcMode = false } = {}) {
   const first = [...inventory.allToolsMap.values()].find(tool => tool.category !== 'initial');
+  const call = isPtcMode ? 'await tools.call_directory' : 'call_directory';
   return [
-    '- Search a concrete operation with `call_directory({ query: "<operation>" })`; lookup never mounts capabilities.',
-    ...(first ? ['- Mount only the selected name, e.g. `call_directory({ names: [' + JSON.stringify(first.name) + '] })`.'] : []),
-    '- Browse a category with `call_directory({ category: "<category id>" })` before selecting exact names.',
+    ...(isPtcMode ? ['- Run these SDK snippets inside `run_code`; use newly mounted bindings in the next `run_code`.'] : []),
+    `- Search a concrete operation with \`${call}({ query: "<operation>" })\`; lookup never mounts capabilities.`,
+    ...(first ? [`- Mount only the selected name, e.g. \`${call}({ names: [${JSON.stringify(first.name)}] })\`.`] : []),
+    `- Browse a category with \`${call}({ category: "<category id>" })\` before selecting exact names.`,
     '- Passing a category or wildcard in names explicitly mounts its whole set; reserve that for tasks requiring the whole set.',
   ];
 }
@@ -732,6 +734,7 @@ export async function buildCompleteInventory(ctx, targetScope, signal, options =
 /** Render a full markdown document describing all available callable capabilities in the harness. */
 export function renderCatalogMarkdown(inventory, options = {}) {
   const { isPtcMode = false, title = 'Diffusion Mode · Call Directory' } = options;
+  const call = isPtcMode ? 'await tools.call_directory' : 'call_directory';
   const { allToolsMap, skills, categories } = inventory;
   const initialList = [...allToolsMap.values()].filter(t => t.category === 'initial').map(t => t.name);
   const totalTools = [...allToolsMap.values()].filter(t => t.category !== 'initial').length;
@@ -746,13 +749,13 @@ export function renderCatalogMarkdown(inventory, options = {}) {
     `- **Total Capabilities in Environment**: **${totalTools}** extended tools + **${skills.length}** domain skills (Skills)`,
     '',
     '## Quick Start (Exact Names)',
-    ...quickUnlockLines(inventory),
+    ...quickUnlockLines(inventory, { isPtcMode }),
     '',
     '## 1. Progressive Disclosure Flow (Catalog → Lookup → Detail/Unlock → Unload)',
-    '1. **Catalog (`catalog`)**: `call_directory()` — Overview capability categories and guidelines.',
-    '2. **Lookup (`lookup`)**: `call_directory({ query: "<keyword>" })` — Search tool or skill names by category or keyword.',
-    '3. **Detail & Unlock (`detail`)**: `call_directory({ names: ["<exact name>"] })` — Mount the selected capability. Categories and wildcards explicitly mount whole sets.',
-    '4. **Dynamic Unload (`unload`)**: `call_directory({ action: "unload", names: ["<name or category>"] })` — Prune tools from context to keep it lightweight.',
+    `1. **Catalog (\`catalog\`)**: \`${call}()\` — Overview capability categories and guidelines.`,
+    `2. **Lookup (\`lookup\`)**: \`${call}({ query: "<keyword>" })\` — Search tool or skill names by category or keyword.`,
+    `3. **Detail & Unlock (\`detail\`)**: \`${call}({ names: ["<exact name>"] })\` — Mount the selected capability. Categories and wildcards explicitly mount whole sets.`,
+    `4. **Dynamic Unload (\`unload\`)**: \`${call}({ action: "unload", names: ["<name or category>"] })\` — Prune tools from context to keep it lightweight.`,
     '',
     '## 2. Callable Capability Categories Overview',
   ];
