@@ -29,8 +29,8 @@
 - **初始极简**：回合起步时仅开放基础 Shell（Bash/PowerShell）、图片查看器及 `call_directory` 目录中枢，减少首轮工具 Schema 占用（实际节省随环境与配置变化）；
 - **自适应动态发现**：根据当前 Harness 宿主内实际安装注册的所有可调用内容（内置核心工具、MCP 外部服务、已安装社区插件与领域技能）自适应聚类，无需外部硬编码；
 - **调用前建议先检索 (Search First)**：明确提醒与推荐模型在调用扩展工具前，优先使用 `call_directory({ query: "关键词" })` 检索确认当前环境中确切存在的工具或技能名称，避免盲目猜测；
-- **按需解锁与伴生联动**：模型或用户通过 `call_directory` 随时检索并挂载所需领域的工具或技能，伴生工具自动联动（如解锁 `subagent` 自动附带 `send_message`、`list_agents`）；
-- **一步直达**：支持丰富的分类别名（如 `names: ["fs", "task"]` 或 `names: ["文档", "浏览器"]`）或 `names: ["*"]` 一键完整展开为全量标准模式；
+- **精确挂载**：默认按工具的精确名称挂载，不自动带出兄弟工具、团队工具或整个插件。技能加载默认只提供说明；伴生依赖与领域推断均可显式配置；
+- **分类浏览**：使用 `category` 检索分类候选，再用 `names` 选择当前操作需要的精确名称。分类别名和 `names: ["*"]` 仍支持显式整组展开；
 - **安全门禁拦截**：强化 `tools/pre-execute` 监听门禁，若模型误调未解锁工具，自动拦截并提供智能搜索建议与一键挂载指令；
 - **动态收敛**：重型任务完成后，支持通过 `unload` 卸载特定工具或 `reset` 一键重置回极简状态，保持长程会话干爽。
 
@@ -42,11 +42,12 @@
 - 🔍 **智能搜索与关键词检索 (Search First)**：
   - 调用未知扩展工具前，明确建议先使用 `call_directory({ query: "..." })` 进行检索；
   - 智能支持中英文同义词（如搜索 `"文档"` 自动联想 `doc`/`docx`/`office`/`univer`/`file`，搜索 `"表格"` 联想 `excel`/`xlsx`/`sheet`，搜索 `"爬虫"` 联想 `crawl`/`tavily` 等）。
-- ⚡ **一步直达宏命令**：
-  - `call_directory({ names: ["core:file", "core:task"] })` 或 `call_directory({ names: ["fs", "task"] })`：秒级挂载文件操作与任务跟踪。
-  - `call_directory({ names: ["core:subagent"] })`：挂载子智能体与团队协作。
-  - `call_directory({ names: ["office"] })` 或 `call_directory({ names: ["文档"] })`：一键挂载办公套件工具链。
-  - `call_directory({ names: ["*"] })`：完整展开为标准模式。
+- ⚡ **检索后精准调用**：
+  - `call_directory({ category: "core:search" })`：只读浏览文件和代码搜索工具。
+  - `call_directory({ names: ["read", "grep"] })`：只挂载读取与搜索工具。
+  - `call_directory({ names: ["subagent"] })`：已注册同名工具时只挂载它，不带出团队工具。
+  - `call_directory({ names: ["core:subagent"] })`：显式挂载委派分类；团队与工作流另行选择。
+  - `call_directory({ names: ["*"] })`：任务确需全部能力时完整展开。
 - 🔄 **动态卸载收敛**：
   - `call_directory({ action: "unload", names: [...] })`：阶段性任务结束后精准卸载，收缩上下文。
   - `call_directory({ action: "reset" })`：重置会话回极简原点。
@@ -72,16 +73,17 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 | :--- | :--- | :--- |
 | `catalog` | 查看全部分类总览与推荐快捷组合（明确提醒建议先用 query 检索） | `call_directory({ action: "catalog" })` |
 | `lookup` | 只读关键词检索候选（推荐在调用前使用），不挂载工具或加载技能正文 | `call_directory({ query: "git" })` 或 `call_directory({ query: "文档" })` |
-| `detail` | 解锁并挂载指定工具/技能（传 `names` 默认执行） | `call_directory({ names: ["fs", "subagent"] })` |
+| `detail` | 解锁并挂载指定工具/技能（传 `names` 默认执行） | `call_directory({ names: ["read", "grep"] })` |
 | `unload` | 动态卸载指定工具以收缩上下文 | `call_directory({ action: "unload", names: ["mcp:rea"] })` |
 | `reset` | 重置会话回初始极简状态 | `call_directory({ action: "reset" })` |
 
 #### 常用分类别名 (Aliases，支持中英文)
-- `fs` / `file` / `文件` / `代码` → `core:file`（文件读写、搜索与工作目录）
-- `task` / `todo` / `任务` / `待办` / `计划` → `core:task`（待办任务、目标与进度管理）
-- `subagent` / `team` / `workflow` / `子智能体` / `团队` → `core:subagent`（子智能体、并发工作流与团队编排）
+- `fs` / `file` / `文件` / `代码` → `core:file`（文件读写与工作目录）；`core:search` 用于文件和代码搜索。
+- `task` / `todo` / `任务` / `待办` / `计划` → `core:task`（规划与澄清）；目标、后台任务、定时任务分别为 `core:goal`、`core:job`、`core:schedule`。
+- `subagent` / `子智能体` → `core:subagent`；团队为 `core:team`，工作流为 `core:workflow`。已注册的精确工具名优先于别名。
+- `terminal` / `终端` → `core:terminal`；`session` / `会话` → `core:session`；工作树与宿主管理仍为 `core:dev`。
 - `web` / `search` / `网页` / `搜索` → `core:web`（网页搜索与正文提取）
-- `dev` / `terminal` / `git` / `终端` / `会话` → `core:dev`（终端命令行、会话追踪与 Git 工作树）
+- `dev` / `git` / `worktree` → `core:dev`（Git 工作树与宿主管理）
 - `office` / `univer` / `文档` / `表格` / `办公` → `plugin:univer`（Univer 办公套件与文档处理）
 - `browser` / `chrome` / `浏览器` → `plugin:browser`（会话内浏览器自动化控制）
 - `image` / `canvas` / `图片` / `生图` → `plugin:image-gen`（AI 生图、图片编辑与画布工作台）
@@ -106,6 +108,8 @@ call_directory({ names: ["read"] })                 // 确认后精准挂载 rea
 
 `query` 为检索关键词，不会作为挂载目标。挂载支持分类别名（如 `names: ["fs"]`）、分类全名（如 `names: ["mcp:tavily"]`）、分类后缀（如 `names: ["tavily"]`、`names: ["vendor"]`）、通配符（如 `names: ["vendor_*"]`）或一键全量展开 `names: ["*"]`。
 
+`category` 单独使用时仅浏览候选；把分类放入 `names` 则明确要求挂载整类。默认不会自动展开伴生组，也不会根据技能名称或描述自动挂载领域工具。挂载结果会分别列出本次新增数量与已可用数量；挂载不等于执行。14 个内置分类在 Native/PTC 下共用，始终按当前作用域实际注册内容生成；PTC 通过 `run_code` 调用已挂载的 SDK 绑定，不会把所有 SDK 工具变成模型顶层函数。
+
 ### ⚙️ 通用配置与兼容边界
 
 本项目是 **DSH 预设**，依赖 DSH 的工具、技能、作用域及会话事件协议；不宣称能直接运行于任意 Agent 框架。默认分类与已知服务别名用于兼容现有用法，不要求安装对应服务。
@@ -125,8 +129,9 @@ Native 与 PTC 预设均显式声明工具呈现模式，不受宿主默认模�
 | `aliases` | 替换别名映射；`{}` 清除默认别名。目标为分类 ID 或工具名称。 |
 | `pluginFamilies` | 替换已知插件规则，支持 `id`、`prefix`、`exact`（名称数组）、`title`、`summary`；`[]` 清除特判。其他带下划线的工具按首段前缀分组。 |
 | `mcpDescriptions` | 替换 MCP 服务说明映射。未知服务仍按 `mcp__<server>__<tool>` 命名发现。 |
-| `companionGroups` | 替换伴随工具组；`[]` 禁用。重叠组会递归展开。 |
-| `skillCompanions` | 声明技能对应的工具链依赖，内置常见办公与领域技能默认映射；自定义配置整体替换。 |
+| `companionGroups` | 默认 `[]`。显式配置后才展开伴随工具组；重叠组会递归展开，可能扩大挂载范围。 |
+| `skillCompanions` | 默认 `{}`。显式声明技能对应的依赖，如 `{ "my-skill": ["read"] }`；分类依赖会挂载整类。 |
+| `inferSkillCompanions` | 默认 `false`。设为 `true` 后按技能领域关键词推断依赖，可能展开整个领域；精准调用场景建议保持关闭。 |
 | `guide` | `false` 关闭运行时操作指引。 |
 | `usageReminder` | 自定义目录尾部提示，或用 `false` 关闭；默认提示不强制使用子智能体或技能。 |
 
@@ -183,7 +188,7 @@ Traditional AI agent workflows inject full schemas for dozens of tools and volum
 - **Lightweight First-Turn Context**: Reduces upfront tool schemas; actual token savings depend on the installed environment and configuration.
 - **Dynamic Scoped Discovery**: Automatically inspects, categorizes, and organizes tools and skills actually installed in the current harness, without rigid external hardcoding.
 - **Search First (Recommended)**: Explicitly encourages calling `call_directory({ query: "<keyword>" })` before calling extended tools to discover exact names in the environment.
-- **One-Step Mounting**: Quickly mounts domain toolkits via aliases like `names: ["fs", "task"]`, Chinese aliases, or expands completely via `names: ["*"]`.
+- **Exact Mounting by Default**: Mount only selected names. Automatic companion groups, skill dependency maps, and domain inference are opt-in. Categories and wildcards still allow explicit whole-set expansion.
 - **Efficient, Read-Only Lookup**: Multilingual search with synonym expansion returns matching candidates with concise summaries. Lookup never dumps heavy parameter schemas or skill bodies.
 - **Execution Guard**: Pre-execution gate intercepts locked tool calls before dispatch, providing clear search guidance and direct mount code snippets.
 - **Dynamic Unloading**: Supports `action: "unload"` and `action: "reset"` to prune tokens during long-horizon sessions.

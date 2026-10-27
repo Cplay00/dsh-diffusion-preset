@@ -4,15 +4,15 @@ Diffusion Mode provides a progressive disclosure runtime for DeepSeek Harness (D
 
 ---
 
-## ⚡ Quick Unlock Macros
+## Precise Mounting
 
-Common scenarios can be unlocked in a single step using category shorthands or direct names:
+Start with an operation, then select only the exact capabilities needed:
 
-- 💻 **Standard Coding & Testing**: `call_directory({ names: ["core:file", "core:task"] })` (or shorthand `names: ["fs", "task"]`)
-- 🤖 **Subagents & Concurrent Workflows**: `call_directory({ names: ["core:subagent"] })` (or shorthand `names: ["subagent"]`)
-- 🌐 **Web Access & Presentation**: `call_directory({ names: ["core:web"] })` (or shorthand `names: ["web"]`)
-- 🎨 **Domain Skills Repository**: `call_directory({ names: ["skills"] })`
-- 🚀 **Full Standard Mode Unlock**: `call_directory({ names: ["*"] })`
+- `call_directory({ query: "<operation>" })`: discover candidates without mounting.
+- `call_directory({ category: "core:search" })`: browse a category without mounting.
+- `call_directory({ names: ["read", "grep"] })`: mount the selected tools.
+- `call_directory({ names: ["skill:<name>"] })`: load the selected skill instructions.
+- Categories and wildcards in `names` explicitly expand whole sets. Use them when the task needs that whole set.
 
 ---
 
@@ -32,9 +32,9 @@ The progressive expansion lifecycle consists of four lightweight phases:
 1. **Search & Lookup (`lookup`)**: `call_directory({ query: "<keyword>" })`  
    Searches specific tools or skills by keyword or category across currently installed harness tools without dumping large parameter schemas into the context.
 2. **Catalog (`catalog`)**: `call_directory()`  
-   Returns the top-level categorization of all callable capabilities available in the current DSH environment and high-leverage scenario shortcuts.
+   Returns the top-level categorization of currently registered capabilities and precise mounting guidance.
 3. **Detail & Unlock (`detail`)**: `call_directory({ names: ["<name1>", "<name2>"] })`  
-   Inspects full parameter schemas and automatically mounts the requested tools or skills into the active session (with automatic companion cascades).
+   Mounts selected capabilities into the active session. Automatic sibling expansion and inferred skill dependencies are disabled by default; configure them explicitly when needed.
 4. **Dynamic Unload (`unload` / `reset`)**:  
    - `call_directory({ action: "unload", names: ["<name or category>"] })`: Selectively unloads heavyweight tools to shrink context.
    - `call_directory({ action: "reset" })`: Resets tool visibility to the configured initial surface. Previously returned skill instructions remain in conversation history.
@@ -45,13 +45,23 @@ The progressive expansion lifecycle consists of four lightweight phases:
 
 | Category ID | Shorthand | Name | Description |
 | :--- | :--- | :--- | :--- |
-| `core:file` | `fs`, `file` | File Operations & Code Search | File reading, writing, precise editing, glob pattern search, and ripgrep code search. |
-| `core:subagent` | `subagent`, `workflow` | Subagents & Team Delegation | Spawning fresh/forked subagents, running concurrent orchestration workflows, and multi-agent teams. |
+| `core:file` | `fs`, `file` | File Operations | Read, write, edit and select the working directory. |
+| `core:search` | `文件搜索`, `代码搜索` | File & Code Search | Find files and search their contents. |
+| `core:subagent` | `subagent` | Delegation | Spawn or fork subagents and control their execution. |
+| `core:team` | `team` | Agent Teams | Teammates and shared task boards. |
+| `core:workflow` | `workflow` | Workflows | Orchestration scripts and Ralph iteration. |
 | `core:skill` | `skill` | Skill Loader & Dependencies | Domain skill loading and resolving workspace runtime dependencies. |
-| `core:task` | `task`, `todo` | Task Planning & Background Jobs | Multi-step task tracking, user questions, long-running goals, and background jobs. |
+| `core:task` | `task`, `todo` | Planning & Clarification | Task lists, user questions and plan review. |
+| `core:goal` | `goal` | Goals | Long-running goal tracking. |
+| `core:job` | `jobs` | Background Jobs | Inspect job output and stop jobs. |
+| `core:schedule` | `schedule` | Scheduling | Scheduled tasks. |
 | `core:web` | `web`, `search` | Web Search & Presentation | Live web searches, web page content extraction, and finished artifact presentation cards. |
-| `core:dev` | `dev`, `terminal` | Developer Tools & Session Trace | Persistent interactive terminals, session history search, and Git worktree management. |
+| `core:dev` | `dev`, `git` | Worktrees & Harness Management | Worktrees and Cordis/plugin management. |
+| `core:terminal` | `terminal` | Persistent Terminals | Open, interact with and close terminals. |
+| `core:session` | `session` | Session History | Search and inspect historical events. |
 | `skills` | `skills` | Domain Skills Repository | Complete domain workflows, coding standards, and best practices (Office, design, analysis, etc.). |
+
+The 14 built-in categories are shared by Native and PTC and only appear when their tools are registered in the current scope. Exact installed tool names take precedence over aliases. Native exposes mounted function schemas; PTC exposes mounted SDK bindings through `run_code`. Mounting does not execute those tools.
 
 ---
 
@@ -67,7 +77,7 @@ Diffusion Mode dynamically discovers and organizes any external capabilities ins
 ## 💡 Prompt Engineering & Context Economy
 
 1. **Subagent Delegation (`subagent`)**: Inspect and unlock delegation tools when useful and permitted by the user and workspace instructions.
-2. **Domain Skills (`skills`)**: Search registered providers for relevant workflows. Skill dependencies use explicit `skillCompanions` mappings, not substring matching or fixed installation paths.
+2. **Domain Skills (`skills`)**: Search registered providers for relevant workflows. Skill dependencies use explicit `skillCompanions` mappings (empty by default). Domain inference requires `inferSkillCompanions: true`; no fixed installation paths are used.
 3. **Context Pruning**: When completing large milestones, call `call_directory({ action: "unload", names: [...] })` to keep the context window lean and focused.
 
 

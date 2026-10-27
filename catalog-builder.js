@@ -11,39 +11,39 @@ export const INITIAL_TOOLS = new Set([
   'structured_output',
 ]);
 
-/** Companion tool groups: unlocking any member automatically unlocks its sibling operational tools. */
-export const COMPANION_GROUPS = [
-  ['subagent', 'subagent_fork', 'send_message', 'interrupt_agent', 'list_agents'],
-  ['spawn_teammate', 'send_message', 'interrupt_agent', 'list_agents', 'wait_agent', 'team_task_create', 'team_task_get', 'team_task_list', 'team_task_update'],
-  ['create_goal', 'get_goal', 'update_goal'],
-  ['job_output', 'job_list', 'job_kill'],
-  ['schedule_create', 'schedule_list', 'schedule_update', 'schedule_delete'],
-  ['terminal_open', 'terminal_send', 'terminal_read', 'terminal_signal', 'terminal_close', 'terminal_list'],
-  ['session_search', 'session_trace', 'session_event_search', 'session_event_read', 'session_event_trace'],
-  ['cordis_inspect_list', 'cordis_inspect_query', 'plugin_manager', 'plugin_market'],
-  ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource'],
-  ['generate_image', 'generate_images', 'edit_image', 'canvas_state', 'view_canvas', 'find_inspiration'],
-  ['browser_navigate', 'browser_click', 'browser_type', 'browser_press', 'browser_scroll', 'browser_snapshot', 'browser_screenshot', 'browser_console', 'browser_network', 'browser_tabs', 'browser_close'],
-  ['task_board_list', 'task_board_get', 'task_board_create', 'task_board_update', 'task_board_set_parent', 'task_board_run', 'task_board_manage', 'task_board_schedule'],
-  ['univer_new', 'univer_status', 'univer_worktree', 'univer_unit', 'univer_import', 'univer_inspect', 'univer_execute', 'univer_export'],
-  ['ssh_list', 'ssh_exec', 'ssh_upload', 'ssh_download', 'ssh_tunnel', 'ssh_cluster'],
-];
+/** Automatic sibling mounting is opt-in; exact names stay exact by default. */
+export const COMPANION_GROUPS = [];
 
 /** Static metadata for core categories and known plugin/MCP families. */
 export const CATEGORY_META = {
   'core:file': {
-    title: 'File Operations & Code Search (Core File & Search)',
-    summary: 'Read, create, edit files precisely, search code with glob patterns or ripgrep regex, and change working directory.',
-    tools: new Set(['read', 'write', 'edit', 'glob', 'grep', 'working_directory', 'ops_read_files', 'ops_discover_tools']),
+    title: 'File Operations',
+    summary: 'Read, write and edit files; select the working directory.',
+    tools: new Set(['read', 'write', 'edit', 'working_directory', 'ops_read_files']),
+  },
+  'core:search': {
+    title: 'File & Code Search',
+    summary: 'Find files and search code without mounting file mutation tools.',
+    tools: new Set(['glob', 'grep', 'ops_discover_tools']),
   },
   'core:subagent': {
-    title: 'Subagent Delegation, Workflows & Teammates (Subagent, Workflow & Team)',
-    summary: 'Spawn fresh or forked subagents (subagent / subagent_fork), execute concurrent orchestration scripts (workflow), run Ralph iteration loops, and collaborate in agent teams.',
+    title: 'Subagent Delegation',
+    summary: 'Start or fork subagents and control their execution. Team task boards and workflows are separate.',
     tools: new Set([
       'subagent', 'subagent_fork', 'send_message', 'interrupt_agent', 'list_agents',
-      'workflow', 'ralph',
+    ]),
+  },
+  'core:team': {
+    title: 'Agent Teams',
+    summary: 'Start teammates, wait for them, and manage shared team tasks.',
+    tools: new Set([
       'spawn_teammate', 'wait_agent', 'team_task_create', 'team_task_get', 'team_task_list', 'team_task_update',
     ]),
+  },
+  'core:workflow': {
+    title: 'Workflows & Iteration',
+    summary: 'Run orchestration scripts or Ralph iteration loops.',
+    tools: new Set(['workflow', 'ralph']),
   },
   'core:skill': {
     title: 'Skill Loader & Runtime Dependencies (Skill Loader & Runtime Dependencies)',
@@ -51,14 +51,24 @@ export const CATEGORY_META = {
     tools: new Set(['skill', 'load_workspace_dependencies']),
   },
   'core:task': {
-    title: 'Task Planning, Long-running Goals, Clarification & Background Jobs (Task, Goal, Question, Jobs & Schedule)',
-    summary: 'Manage multi-step task list (todo_write), ask user questions for clarification (ask_user_question), submit plan review (exit_plan_mode), track long-running goals (goal), and manage background jobs/schedules.',
-    tools: new Set([
-      'todo_write', 'ask_user_question', 'exit_plan_mode',
-      'create_goal', 'get_goal', 'update_goal',
-      'job_output', 'job_list', 'job_kill',
-      'schedule_create', 'schedule_list', 'schedule_update', 'schedule_delete',
-    ]),
+    title: 'Planning & Clarification',
+    summary: 'Track a task list, ask questions, and submit a plan for approval.',
+    tools: new Set(['todo_write', 'ask_user_question', 'exit_plan_mode']),
+  },
+  'core:goal': {
+    title: 'Long-running Goals',
+    summary: 'Create, inspect and update a long-running goal.',
+    tools: new Set(['create_goal', 'get_goal', 'update_goal']),
+  },
+  'core:job': {
+    title: 'Background Jobs',
+    summary: 'List background jobs, read output, and stop a job.',
+    tools: new Set(['job_output', 'job_list', 'job_kill']),
+  },
+  'core:schedule': {
+    title: 'Scheduled Tasks',
+    summary: 'Create, inspect, update and delete scheduled tasks.',
+    tools: new Set(['schedule_create', 'schedule_list', 'schedule_update', 'schedule_delete']),
   },
   'core:web': {
     title: 'Web Search, Fetch & Artifact Presentation (Web Search/Fetch & Present)',
@@ -66,13 +76,19 @@ export const CATEGORY_META = {
     tools: new Set(['web_search', 'web_fetch', 'present']),
   },
   'core:dev': {
-    title: 'Persistent Terminals, Session Search, Worktrees & Cordis (Terminal, Session, Worktree & Cordis)',
-    summary: 'Interact with persistent terminal shells (terminal_*), search historical session events (session_*), create Git worktrees, and inspect/manage Cordis plugins and presets.',
-    tools: new Set([
-      'terminal_open', 'terminal_send', 'terminal_read', 'terminal_signal', 'terminal_close', 'terminal_list',
-      'session_search', 'session_trace', 'session_event_search', 'session_event_read', 'session_event_trace',
-      'create_worktree', 'cordis_inspect_list', 'cordis_inspect_query', 'plugin_manager', 'plugin_market',
-    ]),
+    title: 'Worktrees & Harness Management',
+    summary: 'Create worktrees and inspect or manage the harness and its plugins.',
+    tools: new Set(['create_worktree', 'cordis_inspect_list', 'cordis_inspect_query', 'plugin_manager', 'plugin_market']),
+  },
+  'core:terminal': {
+    title: 'Persistent Terminals',
+    summary: 'Open, interact with and close persistent terminals.',
+    tools: new Set(['terminal_open', 'terminal_send', 'terminal_read', 'terminal_signal', 'terminal_close', 'terminal_list']),
+  },
+  'core:session': {
+    title: 'Session History',
+    summary: 'Search and inspect historical sessions and events.',
+    tools: new Set(['session_search', 'session_trace', 'session_event_search', 'session_event_read', 'session_event_trace']),
   },
 };
 
@@ -85,33 +101,38 @@ export const CATEGORY_ALIASES = {
   code: 'core:file',
   '文件': 'core:file',
   '代码': 'core:file',
+  '文件搜索': 'core:search',
+  '代码搜索': 'core:search',
 
   // Core: subagent & workflows
   subagent: 'core:subagent',
   subagents: 'core:subagent',
   agent: 'core:subagent',
   agents: 'core:subagent',
-  team: 'core:subagent',
-  teams: 'core:subagent',
-  workflow: 'core:subagent',
-  ralph: 'core:subagent',
+  team: 'core:team',
+  teams: 'core:team',
+  workflow: 'core:workflow',
+  ralph: 'core:workflow',
   '子智能体': 'core:subagent',
   '智能体': 'core:subagent',
-  '工作流': 'core:subagent',
-  '团队': 'core:subagent',
+  '工作流': 'core:workflow',
+  '团队': 'core:team',
 
   // Core: task & planning
   task: 'core:task',
   tasks: 'core:task',
   todo: 'core:task',
-  jobs: 'core:task',
-  schedule: 'core:task',
+  jobs: 'core:job',
+  job: 'core:job',
+  schedule: 'core:schedule',
   plan: 'core:task',
-  goal: 'core:task',
+  goal: 'core:goal',
   '任务': 'core:task',
   '待办': 'core:task',
   '计划': 'core:task',
-  '目标': 'core:task',
+  '目标': 'core:goal',
+  '后台任务': 'core:job',
+  '定时': 'core:schedule',
 
   // Core: web
   web: 'core:web',
@@ -123,15 +144,15 @@ export const CATEGORY_ALIASES = {
 
   // Core: dev & terminal
   dev: 'core:dev',
-  terminal: 'core:dev',
-  term: 'core:dev',
-  shell: 'core:dev',
-  session: 'core:dev',
-  sessions: 'core:dev',
+  terminal: 'core:terminal',
+  term: 'core:terminal',
+  shell: 'core:terminal',
+  session: 'core:session',
+  sessions: 'core:session',
   git: 'core:dev',
   worktree: 'core:dev',
-  '终端': 'core:dev',
-  '会话': 'core:dev',
+  '终端': 'core:terminal',
+  '会话': 'core:session',
   '开发': 'core:dev',
 
   // Core: skill
@@ -372,47 +393,8 @@ export const KNOWN_PLUGIN_FAMILIES = [
   },
 ];
 
-/** Recommended built-in skill companion mapping for common DSH domain workflows. */
-export const DEFAULT_SKILL_COMPANIONS = {
-  docx: ['load_workspace_dependencies', 'read', 'write', 'edit'],
-  'docx-viewer': ['read'],
-  pdf: ['load_workspace_dependencies', 'read', 'write', 'edit'],
-  'pdf-viewer': ['read'],
-  pptx: ['load_workspace_dependencies', 'read', 'write', 'edit'],
-  'pptx-viewer': ['read'],
-  xlsx: ['load_workspace_dependencies', 'read', 'write', 'edit'],
-  'xlsx-viewer': ['read'],
-  office: ['load_workspace_dependencies', 'read', 'write', 'edit'],
-  'office-docx': ['load_workspace_dependencies', 'read', 'write', 'edit'],
-  'office-pptx': ['load_workspace_dependencies', 'read', 'write', 'edit'],
-  'office-xlsx': ['load_workspace_dependencies', 'read', 'write', 'edit'],
-  'office-export-pdf': ['load_workspace_dependencies'],
-  'office-render': ['load_workspace_dependencies'],
-  'office-recalculate': ['load_workspace_dependencies'],
-  'ppt-master': ['load_workspace_dependencies', 'read', 'write', 'edit', 'generate_image'],
-  'dsh-ppt-fusion': ['dsh_ppt_preview', 'dsh_ppt_propose', 'dsh_ppt_review'],
-  'open-design-mode': ['mcp:open-design'],
-  'reverse-engineer-anything': ['mcp:rea'],
-  'control-browser': ['plugin:browser'],
-  'kimi-webbridge': ['plugin:browser'],
-  'web-gui-tester': ['plugin:browser'],
-  'tavily-search': ['mcp:tavily'],
-  'tavily-extract': ['mcp:tavily'],
-  'tavily-crawl': ['mcp:tavily'],
-  'tavily-map': ['mcp:tavily'],
-  'tavily-research': ['mcp:tavily'],
-  'tavily-cli': ['mcp:tavily'],
-  'tavily-dynamic-search': ['mcp:tavily'],
-  'tavily-best-practices': ['mcp:tavily'],
-  univer: ['plugin:univer'],
-  'univer-sheet': ['plugin:univer'],
-  'univer-doc': ['plugin:univer'],
-  'univer-slide': ['plugin:univer'],
-  'univer-board': ['plugin:univer'],
-  'univer-base': ['plugin:univer'],
-  'univer-embed': ['plugin:univer'],
-  'univer-cross-unit-formula': ['plugin:univer'],
-};
+/** Skill dependencies are configured explicitly, independently of skill names or domains. */
+export const DEFAULT_SKILL_COMPANIONS = {};
 
 /** Concise footer reminder placed at the end of directory outputs (focused on Subagent & Skill). */
 export const USAGE_REMINDER_FOOTER = [
@@ -441,7 +423,7 @@ export function createCatalogPolicy(config = {}) {
     mcpDescriptions: Object.assign(Object.create(null), config.mcpDescriptions ?? KNOWN_MCP_DESCRIPTIONS),
     companionGroups: config.companionGroups ?? COMPANION_GROUPS,
     skillCompanions: Object.assign(Object.create(null), config.skillCompanions ?? DEFAULT_SKILL_COMPANIONS),
-    inferSkillCompanions: config.inferSkillCompanions !== false,
+    inferSkillCompanions: config.inferSkillCompanions === true,
     usageReminder: config.usageReminder === false ? '' : config.usageReminder ?? USAGE_REMINDER_FOOTER,
   };
 }
@@ -469,69 +451,13 @@ export function firstLineSummary(text, maxLen = 140) {
 
 /** Recommend scenario-based shortcuts and installed categories in this inventory. */
 export function quickUnlockLines(inventory) {
-  const ids = new Set(inventory.categories.keys());
-  const lines = [];
-
-  // High-leverage domain scenario shortcuts based on currently discovered capabilities
-  if (ids.has('core:file') && ids.has('core:task')) {
-    lines.push('- 💻 **Coding & Tasks**: `call_directory({ names: ["core:file", "core:task"] })`');
-  } else if (ids.has('core:file')) {
-    lines.push('- 💻 **File Operations & Code Search**: `call_directory({ names: ["core:file"] })`');
-  }
-
-  if (ids.has('core:subagent')) {
-    lines.push('- 🤖 **Subagents & Team Workflows**: `call_directory({ names: ["core:subagent"] })`');
-  }
-  if (ids.has('plugin:univer')) {
-    lines.push('- 📄 **Office & Documents (Univer)**: `call_directory({ names: ["plugin:univer"] })`');
-  }
-  if (ids.has('plugin:browser')) {
-    lines.push('- 🌐 **Browser Automation (Browser)**: `call_directory({ names: ["plugin:browser"] })`');
-  }
-  if (ids.has('plugin:image-gen')) {
-    lines.push('- 🎨 **AI Image Generation & Canvas**: `call_directory({ names: ["plugin:image-gen"] })`');
-  }
-  if (ids.has('plugin:memory')) {
-    lines.push('- 🧠 **Persistent Memory & Context**: `call_directory({ names: ["plugin:memory"] })`');
-  }
-  if (ids.has('plugin:market')) {
-    lines.push('- 🔌 **Plugin Market & Extensions**: `call_directory({ names: ["plugin:market"] })`');
-  }
-  if (ids.has('plugin:ssh')) {
-    lines.push('- ⚡ **SSH & Remote Cluster**: `call_directory({ names: ["plugin:ssh"] })`');
-  }
-  if (ids.has('mcp:tavily')) {
-    lines.push('- 🔍 **Tavily AI Search & Research**: `call_directory({ names: ["mcp:tavily"] })`');
-  }
-  if (ids.has('mcp:open-design')) {
-    lines.push('- 🎨 **OpenDesign UI/UX Workspace**: `call_directory({ names: ["mcp:open-design"] })`');
-  }
-  if (ids.has('mcp:rea')) {
-    lines.push('- 🔬 **Reverse Engineering (REA)**: `call_directory({ names: ["mcp:rea"] })`');
-  }
-  if (ids.has('skills')) {
-    lines.push('- 🎯 **Domain Skills Repository**: `call_directory({ names: ["skills"] })`');
-  }
-
-  // Discoverable categories not yet covered above
-  const standardCovered = new Set([
-    'core:file', 'core:task', 'core:subagent',
-    'plugin:univer', 'plugin:browser', 'plugin:image-gen',
-    'plugin:memory', 'plugin:market', 'plugin:ssh',
-    'mcp:tavily', 'mcp:open-design', 'mcp:rea', 'skills',
-  ]);
-
-  for (const id of ids) {
-    if (!standardCovered.has(id)) {
-      const category = inventory.categories.get(id);
-      if (category) {
-        lines.push(`- **${category.title}**: \`call_directory({ names: [${JSON.stringify(id)}] })\``);
-      }
-    }
-  }
-
-  lines.push('- 🚀 **Full Tool Unlock**: `call_directory({ names: ["*"] })`');
-  return lines;
+  const first = [...inventory.allToolsMap.values()].find(tool => tool.category !== 'initial');
+  return [
+    '- Search a concrete operation with `call_directory({ query: "<operation>" })`; lookup never mounts capabilities.',
+    ...(first ? ['- Mount only the selected name, e.g. `call_directory({ names: [' + JSON.stringify(first.name) + '] })`.'] : []),
+    '- Browse a category with `call_directory({ category: "<category id>" })` before selecting exact names.',
+    '- Passing a category or wildcard in names explicitly mounts its whole set; reserve that for tasks requiring the whole set.',
+  ];
 }
 
 /** Heuristically infer required companion tools based on skill domain keywords (using word boundaries). */
@@ -819,13 +745,13 @@ export function renderCatalogMarkdown(inventory, options = {}) {
     `- **Default Basic Tools**: ${initialList.map(t => `\`${t}\``).join(', ')}`,
     `- **Total Capabilities in Environment**: **${totalTools}** extended tools + **${skills.length}** domain skills (Skills)`,
     '',
-    '## ⚡ Quick Unlocks (Common Scenarios)',
+    '## Quick Start (Exact Names)',
     ...quickUnlockLines(inventory),
     '',
     '## 1. Progressive Disclosure Flow (Catalog → Lookup → Detail/Unlock → Unload)',
     '1. **Catalog (`catalog`)**: `call_directory()` — Overview capability categories and guidelines.',
     '2. **Lookup (`lookup`)**: `call_directory({ query: "<keyword>" })` — Search tool or skill names by category or keyword.',
-    '3. **Detail & Unlock (`detail`)**: `call_directory({ names: ["<name or category>"] })` — Unlock and mount tools/skills immediately (supports aliases and wildcard `*`).',
+    '3. **Detail & Unlock (`detail`)**: `call_directory({ names: ["<exact name>"] })` — Mount the selected capability. Categories and wildcards explicitly mount whole sets.',
     '4. **Dynamic Unload (`unload`)**: `call_directory({ action: "unload", names: ["<name or category>"] })` — Prune tools from context to keep it lightweight.',
     '',
     '## 2. Callable Capability Categories Overview',

@@ -87,7 +87,7 @@ const mockAgent = {
 
 const catalogRes = await registeredTool.execute({}, { agent: mockAgent });
 assert.strictEqual(catalogRes.stage, 'catalog');
-assert(catalogRes.report.includes('⚡ Quick Unlocks (Common Scenarios)'), 'Must include Quick Unlocks section');
+assert(catalogRes.report.includes('Quick Start (Exact Names)'), 'Must guide precise mounting');
 assert(catalogRes.report.includes('Capability Guidance (Subagents & Skills)'), 'Must include core reminder header');
 assert(!catalogRes.report.includes('serialize everything in the main session'), 'Footer must be concise');
 console.log('✓ Test 3: Catalog is clear, structured, and concise');

@@ -146,7 +146,7 @@ test('lookup pagination gracefully sanitizes parameters without hard errors and 
   }
   const result = await h.call(agent, { query: 'read', offset: 99 });
   assert.match(result.report, /No items on this page/);
-  assert.match(result.report, /Mount Directly/);
+  assert.doesNotMatch(result.report, /Mount Directly/);
   assert.deepEqual(result.unlocked, []);
 });
 
@@ -289,6 +289,69 @@ test('overlapping companion groups expand transitively in either order', async t
   assert.deepEqual((await h.call(h.agent(), { names: ['c'] })).unlocked.sort(), ['a', 'b', 'c']);
 });
 
+for (const mode of ['native', 'ptc']) {
+  test(`${mode}: exact mounting does not bridge delegation into teams or sibling tool families`, async t => {
+    const names = ['working_directory', 'read', 'write', 'edit', 'glob', 'grep', 'subagent', 'subagent_fork',
+      'send_message', 'interrupt_agent', 'list_agents', 'spawn_teammate', 'wait_agent',
+      'team_task_create', 'team_task_get', 'team_task_list', 'team_task_update'];
+    const h = harness(t, { mode }, { names });
+    const agent = h.agent();
+    const before = h.visible(agent);
+    const lookup = await h.call(agent, { category: 'core:subagent' });
+    assert.deepEqual(lookup.unlocked, []);
+    assert.deepEqual(h.visible(agent), before);
+    assert.doesNotMatch(lookup.report, /`spawn_teammate`|`team_task_create`/);
+    const precise = await h.call(agent, { names: ['read', 'grep', 'subagent'] });
+    assert.deepEqual(precise.unlocked.sort(), ['grep', 'read', 'subagent']);
+    assert.match(precise.report, /3 newly mounted, 0 already available/);
+    const repeated = await h.call(agent, { names: ['read', 'grep', 'subagent'] });
+    assert.match(repeated.report, /0 newly mounted, 3 already available/);
+    await h.call(agent, { action: 'reset' });
+    const screenshot = await h.call(agent, { names: ['fs', 'subagent'] });
+    assert.deepEqual(screenshot.unlocked.sort(), ['edit', 'read', 'subagent', 'working_directory', 'write']);
+    assert(!h.visible(agent).includes('spawn_teammate'));
+    await h.call(agent, { action: 'reset' });
+    assert((await h.call(agent, { names: ['*'] })).unlocked.includes('*'));
+    for (const name of names) assert(h.visible(agent).includes(name), 'full expansion must remain available');
+  });
+
+  test(`${mode}: loading a skill defaults to instructions without implicit domain mounts`, async t => {
+    const h = harness(t, { mode }, { names: ['skill', 'read', 'write', 'load_workspace_dependencies',
+      ...Array.from({ length: 30 }, (_, i) => `browser_action_${i}`)] });
+    const agent = h.agent();
+    for (const name of ['docx', 'kimi-webbridge', 'custom-browser-skill']) {
+      h.skillDefs.set(name, { name, description: 'Edit word document in browser', content: 'Workflow instructions' });
+      const loaded = await h.call(agent, { names: [`skill:${name}`] });
+      assert.deepEqual(loaded.loadedSkills, [name]);
+      assert.deepEqual(loaded.unlocked, ['skill']);
+      const originalGet = h.ctx.skills.get;
+      let fetches = 0;
+      h.ctx.skills.get = async (...args) => { fetches++; return originalGet(...args); };
+      await h.hooks.get('tools/result')[0]({ agent, name: 'skill', arguments: { name } }, { isError: false });
+      h.ctx.skills.get = originalGet;
+      assert.equal(fetches, 0, 'default result handling must not read the skill a second time');
+      assert.deepEqual(h.visible(agent).filter(n => n !== 'call_directory'), ['skill']);
+    }
+  });
+}
+
+test('built-in categories separate planning, scheduling, jobs, search, teams and session tooling', async t => {
+  const expected = {
+    read: 'core:file', grep: 'core:search', subagent: 'core:subagent', spawn_teammate: 'core:team',
+    workflow: 'core:workflow', ralph: 'core:workflow', todo_write: 'core:task', create_goal: 'core:goal',
+    job_list: 'core:job', schedule_create: 'core:schedule', terminal_read: 'core:terminal',
+    session_search: 'core:session', create_worktree: 'core:dev', skill: 'core:skill', web_fetch: 'core:web',
+  };
+  const h = harness(t, {}, { names: Object.keys(expected) });
+  const inventory = await buildCompleteInventory(h.ctx);
+  for (const [name, category] of Object.entries(expected)) assert.equal(inventory.allToolsMap.get(name).category, category);
+  const agent = h.agent();
+  assert.deepEqual((await h.call(agent, { names: ['goal'] })).unlocked, ['create_goal']);
+  await h.call(agent, { action: 'reset' });
+  assert.deepEqual((await h.call(agent, { names: ['team'] })).unlocked, ['spawn_teammate']);
+  assert.doesNotMatch(h.ctx.guide.text(), /names: \["fs"|cascade-mount/);
+});
+
 test('skill dependencies use explicit declarations instead of name substrings', async t => {
   const h = harness(t, { skillCompanions: { declared: ['write'] } });
   const agent = h.agent();
@@ -416,7 +479,7 @@ test('MCP, team, and image prompt sections follow actual tool visibility', async
   assert.equal((await assemble()).contexts.length, 0);
 });
 
-test('image and browser plugin families, aliases, and companion groups expand cleanly', async t => {
+test('image and browser categories expand explicitly while exact names stay exact', async t => {
   const imageTools = ['generate_image', 'generate_images', 'edit_image', 'canvas_state', 'view_canvas', 'find_inspiration'];
   const browserTools = ['browser_navigate', 'browser_click', 'browser_snapshot'];
   const h = harness(t, {}, { names: [...imageTools, ...browserTools] });
@@ -436,20 +499,18 @@ test('image and browser plugin families, aliases, and companion groups expand cl
     assert(h.visible(agent).includes(tName));
   }
 
-  // Test companion expansion: mounting generate_image automatically unlocks edit_image and canvas_state
+  // An exact name does not imply the rest of a plugin family.
   await h.call(agent, { action: 'reset' });
   const singleMount = await h.call(agent, { names: ['generate_image'] });
-  assert(singleMount.unlocked.includes('generate_image'));
-  assert(singleMount.unlocked.includes('edit_image'));
-  assert(singleMount.unlocked.includes('canvas_state'));
+  assert.deepEqual(singleMount.unlocked, ['generate_image']);
 });
 
-test('skill case-insensitivity with skill: prefix and default skill companions unlocking', async t => {
-  const h = harness(t, {}, { names: ['read', 'write', 'edit', 'load_workspace_dependencies'] });
+test('skill case-insensitivity with skill: prefix and explicit skill companions', async t => {
+  const h = harness(t, { skillCompanions: { docx: ['read', 'write', 'edit', 'load_workspace_dependencies'] } }, { names: ['read', 'write', 'edit', 'load_workspace_dependencies'] });
   const agent = h.agent();
   h.skillDefs.set('docx', { name: 'docx', description: 'DOCX Suite', content: 'Generate word doc' });
 
-  // Mounting with mixed case 'skill:Docx' works and auto-unlocks default companions
+  // Mounting with mixed case 'skill:Docx' respects configured dependencies.
   const result = await h.call(agent, { names: ['skill:Docx'] });
   assert.deepEqual(result.loadedSkills, ['docx']);
   assert(h.visible(agent).includes('read'));
@@ -497,7 +558,7 @@ test('multilingual keyword search and prominent search-first recommendations', a
 });
 
 test('dynamic classification and heuristic companion deduction for installed capabilities', async t => {
-  const h = harness(t, {}, { names: ['memory_store', 'ops_check', 'custom_tool'] });
+  const h = harness(t, { inferSkillCompanions: true }, { names: ['memory_store', 'ops_check', 'custom_tool'] });
   const agent = h.agent();
 
   // Dynamic classification of memory and ops tools
@@ -579,7 +640,7 @@ test('composed schema guidance preserves empty branches, required-only branches 
 });
 
 test('native skill tool callback triggers identical companion expansion with categories and inference', async t => {
-  const h = harness(t, {}, { names: ['browser_navigate', 'browser_click'] });
+  const h = harness(t, { inferSkillCompanions: true }, { names: ['browser_navigate', 'browser_click'] });
   const agent = h.agent();
   h.skillDefs.set('kimi-webbridge', {
     name: 'kimi-webbridge',
@@ -597,7 +658,7 @@ test('native skill tool callback triggers identical companion expansion with cat
 for (const mode of ['native', 'ptc']) {
   for (const action of ['reset', 'unload', 'replayed reset', 'dispose']) {
     test(`${mode}: delayed skill result cannot override ${action}`, async t => {
-      const h = harness(t, { mode }, { names: ['skill', 'browser_navigate', 'browser_click'] });
+      const h = harness(t, { mode, skillCompanions: { 'kimi-webbridge': ['plugin:browser'] } }, { names: ['skill', 'browser_navigate', 'browser_click'] });
       const agent = h.agent();
       h.skillDefs.set('kimi-webbridge', { name: 'kimi-webbridge', description: 'Control browser', content: 'Instructions' });
       let release;

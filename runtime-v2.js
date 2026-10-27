@@ -365,13 +365,13 @@ export function apply(ctx, config = {}) {
       `- **Currently Available Basic Tools**: ${initialList.map(t => `\`${t}\``).join(', ')}`,
       `- **Total Capabilities in Environment**: **${totalTools}** extended tools (**${unlockedCount}** unlocked) + **${skills.length}** domain skills (Skills)`,
       '',
-      '## ⚡ Quick Unlocks (Common Scenarios)',
+      '## Quick Start (Exact Names)',
       ...quickUnlockLines(inventory),
       '',
       '## 1. Progressive Disclosure Flow (Search First → Mount → Execute → Unload)',
       '1. **Search (Recommended)**: `call_directory({ query: "<keyword>" })` — Discover exact tool & skill names installed in this harness.',
       '2. **Catalog (`catalog`)**: `call_directory()` — Overview all currently active capability categories and shortcuts.',
-      '3. **Detail & Unlock (`detail`)**: `call_directory({ names: ["<name or category>"] })` — Unlock and mount tools/skills immediately (supports aliases and wildcard `*`).',
+      '3. **Detail & Unlock (`detail`)**: `call_directory({ names: ["<exact name>"] })` — Mount the selected capability. Categories and wildcards explicitly mount whole sets.',
       '4. **Dynamic Unload (`unload`)**: `call_directory({ action: "unload", names: ["<name or category>"] })` — Prune tools from context to keep it lightweight.',
       '',
       '## 2. Callable Capability Categories Overview',
@@ -559,6 +559,7 @@ const QUERY_SYNONYMS = {
 
     if (page.length === 0) {
       lines.push('', `No items on this page (offset: ${offset}, total matches: ${matches.length}). Retry with offset: 0 or a smaller offset.`);
+      return lines.join('\n');
     } else {
       lines.push(`- Showing ${offset + 1}-${offset + page.length} of ${matches.length} matches.`, '', '## Candidates');
       for (const item of page) {
@@ -572,7 +573,7 @@ const QUERY_SYNONYMS = {
       }
     }
 
-    const firstItem = page[0] ?? matches[0];
+    const firstItem = page[0];
     const target = firstItem ? (firstItem.kind === 'skill' ? `skill:${firstItem.name}` : firstItem.name) : '<name>';
     lines.push(
       '',
@@ -762,9 +763,10 @@ const QUERY_SYNONYMS = {
         `✅ **All ${allToolNames.size} tools unlocked in current session!** Current session now matches full ${isPtcMode ? 'PTC Mode' : 'Standard Mode'}.`
       );
     } else if (finalTools.size > 0) {
+      const newlyMounted = [...finalTools].filter(name => !allToolsMap.get(name)?.unlocked).length;
       lines.push(
         '',
-        `✅ **Successfully unlocked & mounted (${finalTools.size} tools)**: ${[...finalTools].map(t => `\`${t}\``).join(', ')}`,
+        `✅ **Available (${finalTools.size} tools; ${newlyMounted} newly mounted, ${finalTools.size - newlyMounted} already available)**: ${[...finalTools].map(t => `\`${t}\``).join(', ')}`,
         isPtcMode
           ? '> Calling syntax (PTC Mode): Call via `await tools.<name>(args)` in subsequent `run_code` execution.'
           : '> Calling syntax (Standard Mode): Native schemas are now mounted in the session; call them directly as native function calls in subsequent turns.'
@@ -958,7 +960,7 @@ const QUERY_SYNONYMS = {
         },
         names: {
           description:
-            'Specific name(s) or alias to mount or unload (array or comma-separated string; e.g. "read", "docx", category alias like "fs", or "*" for full unlock).',
+            'Exact tool/skill names to mount or unload (e.g. ["read", "grep"]). Category aliases and wildcards mount whole sets; prefer category/query lookup before selecting exact names.',
           oneOf: [
             { type: 'array', items: { type: 'string' } },
             { type: 'string' },
@@ -1066,16 +1068,10 @@ const QUERY_SYNONYMS = {
         'The current session runs in **Diffusion Mode**, starting with minimal essential tools and progressively expanding on demand to keep context lean and focused.',
         '',
         '## ⚡ Operating Guidelines (Search First Recommended)',
-        '1. 🔍 **Search First (Recommended)**: Before calling extended tools or when unsure of exact tool names in this harness, search first via `call_directory({ query: "<keyword>" })` (e.g. `query: "git"`, `query: "excel"`, `query: "browser"`). Inspect available categories with `call_directory()`. Lookup is lightweight and never dumps schemas.',
-        '2. 🚀 **Direct Mount**: Once the exact tool name or category alias is known, mount directly in one step: `call_directory({ names: [...] })` (e.g. `names: ["fs", "task"]`, `names: ["browser"]`, or wildcard `names: ["*"]` for full mode). Associated companions cascade-mount automatically.',
-        '3. 🧹 **Dynamic Pruning**: When completing a major milestone, call `call_directory({ action: "unload", names: [...] })` or `{ action: "reset" }` to prune tokens and keep long-horizon context crisp.',
-        '',
-        '## 🧭 Common Intent Shortcuts (Direct Mount)',
-        '- 💻 **Code & Files**: `names: ["fs"]` | 📋 **Tasks & Goals**: `names: ["task"]`',
-        '- 🤖 **Subagents & Team**: `names: ["subagent"]` | 📄 **Office & Docs**: `names: ["office"]`',
-        '- 🌐 **Browser & Web**: `names: ["browser", "web"]` | 🎨 **Image & UI**: `names: ["image", "ui"]`',
-        '- 🧠 **Memory & Context**: `names: ["memory"]` | 🔌 **Plugins & Market**: `names: ["market"]`',
-        '- 🎯 **Domain Skills**: `names: ["skills"]` | 🚀 **Full Unlock**: `names: ["*"]`',
+        '1. **Search First (Recommended)**: Reuse tools already available. Search a concrete operation with `call_directory({ query: "<operation>" })`. Inspect available categories with `call_directory()`; `call_directory({ category: "<id>" })` lists candidates without mounting.',
+        '2. **Mount Exact Names**: Select only the tool or skill needed for the next action: `call_directory({ names: ["<exact name>"] })`. Do not mount search results as a batch. Categories and wildcards in names mount whole sets; use them only when the task requires that whole set.',
+        isPtcMode ? '3. **Execute**: Use `await tools.<name>(args)` inside `run_code`; mounting exposes SDK bindings, not additional top-level model tools.' : '3. **Execute**: Invoke the mounted native tool directly. Mounting makes a tool available; it does not execute it.',
+        '4. **Prune**: Unload tools no longer needed with `call_directory({ action: "unload", names: [...] })` or reset with `{ action: "reset" }`.',
       ].join('\n'),
   });
 
@@ -1156,8 +1152,7 @@ const QUERY_SYNONYMS = {
       }
 
       const family = classifyTool(toolName, policy);
-      const alias = Object.entries(CATEGORY_ALIASES).find(([k, v]) => v === family)?.[0] || family;
-      const msg = `Diffusion Mode Guard: Tool "${toolName}" is installed in this harness (${family}) but is currently locked to preserve context budget.\n💡 Recommendation: Search capabilities with \`call_directory({ query: "${toolName}" })\`, or mount directly with \`call_directory({ names: [${JSON.stringify(toolName)}] })\` or category \`call_directory({ names: [${JSON.stringify(alias)}] })\`.`;
+      const msg = `Diffusion Mode Guard: Tool "${toolName}" is installed in this harness (${family}) but is currently locked to preserve context budget.\n💡 Recommendation: Search capabilities with \`call_directory({ query: "${toolName}" })\`, or mount directly with \`call_directory({ names: [${JSON.stringify(toolName)}] })\`.`;
       return {
         kind: 'deny',
         reason: msg,
@@ -1194,6 +1189,7 @@ const QUERY_SYNONYMS = {
     if (disposed || result?.isError || !agent || !controller.ownsAgent(agent) || exec?.name !== 'skill') return;
     const skillName = exec?.arguments?.name;
     if (typeof skillName !== 'string') return;
+    if (!policy.inferSkillCompanions && normalizeTokenList(policy.skillCompanions[skillName]).length === 0) return;
     const state = getAgentState(agent);
     const pruneRevision = state.pruneRevision;
 
