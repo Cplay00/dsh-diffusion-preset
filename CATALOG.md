@@ -99,6 +99,8 @@ See [README configuration](README.md) for replaceable initial tools, categories,
 - `/runtime` and `/runtime-v2` export the same controller.
 - Each directory request reads the requesting scope directly. A host snapshot is never substituted for an agent inventory, and tools from a sample agent are not merged into other scopes.
 - Functional categories and known plugin/MCP capabilities include operation recipes. Focused single-category lookup/mount results reveal the relevant recipe; broad mixed results and the initial prompt do not expand every workflow.
+- Recognized native operation sections follow mounted tools, including grouped job, terminal, session-query and goal guidance. Image defaults follow image generation/editing tools; canvas context follows image/canvas capabilities. Unload, removal and scope changes update these instructions as well as schemas.
+- The constant guide keeps discovery, exact mounting, mode-specific invocation and scope boundaries brief. Collaboration contracts expand when relevant. Unknown sections and host permission/approval policies are preserved; verbosity and call counts are optimization references, never output truncation or permission bypass mechanisms.
 - Unknown services and custom categories receive generic contract-based guidance. Optional `guidance` metadata and `categoryGuidance` overrides customize it without inventing tools, installing services or changing visibility; `categoryGuidance: false` disables recipes.
 - Full unlock supports selective exclusions; Native and PTC directory result metadata persists unlock, unload and reset state.
 - Wildcard prefix expansion requires an explicit `*` for both mount and unload.

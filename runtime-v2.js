@@ -1,12 +1,15 @@
 import {
   buildCompleteInventory, createCatalogPolicy, firstLineSummary,
   getScopeOf, normalizeTokenList, quickUnlockLines, renderSkillContent, unwrapService,
-  inferSkillCompanions, classifyTool, getCategoryGuidance, toolsForSource,
+  inferSkillCompanions, classifyTool, getCategoryGuidance, toolsForSource, CATEGORY_META,
 } from './catalog-builder.js';
 
 export const name = 'diffusion-controller';
 export const inject = ['tools', 'systemPrompt', 'skills', 'workingDirectory'];
 const VIEW_HOOK_SYM = Symbol.for('dsh.diffusion.viewHook.v3');
+// DSH groups some native tool instructions under a shared section name.
+const TOOL_PROMPT_CATEGORIES = { jobs: 'job', pty: 'terminal', 'session-query': 'session', goal: 'goal' };
+const CORE_TOOL_NAMES = new Set(Object.values(CATEGORY_META).flatMap(meta => [...meta.tools]));
 
 /** Preserve all registered argument constraints in single-tool detail output. */
 function formatParameterSchema(parameters) {
@@ -1051,6 +1054,13 @@ const QUERY_SYNONYMS = {
     const canStartTeam = !assigned && available.has('spawn_teammate') && (!membership || membership.role === 'lead');
     const coordinating = teamContextTools.some(name => available.has(name) && isVisible(name));
     if (!launchers.length && !canStartTeam && !assigned && !coordinating) return [];
+    const active = assigned || coordinating || launchers.some(isVisible);
+    if (!active) return [
+      '', '## Adaptive Collaboration',
+      'Stay solo for small, serial or tightly coupled work; delegate when worthwhile.',
+      ...(launchers.length ? [`Choose ${launchers.map(name => name === 'subagent' ? '`subagent` for fresh context' : '`subagent_fork` for completed conversation history').join(' or ')}.`] : []),
+      ...(canStartTeam ? ['Durable team: `spawn_teammate` for sustained parallel roles; reuse members.'] : []),
+    ];
     const lines = [
       '',
       '## Adaptive Collaboration',
@@ -1078,23 +1088,19 @@ const QUERY_SYNONYMS = {
     interpolate: false,
     text: context =>
       [
-        `# Diffusion Mode (${isPtcMode ? 'PTC Edition' : 'Standard Edition'}) · Progressive Workflow`,
-        '',
-        'The current session runs in **Diffusion Mode**, starting with minimal essential tools and progressively expanding on demand to keep context lean and focused.',
-        '',
-        '**Choose per operation**: Prefer registered dedicated tools for supported file, web/browser, remote/service, media/memory and session/task work. Discover and mount them before using shell commands or raw APIs as substitutes. Use a shell, when available, for actual CLI work such as Git, builds and tests, or operations without a suitable registered tool. A CLI step does not make shell the right route for the task\'s other operations. Search one operation per query: its terms constrain a single candidate. When category workflow guidance is returned, follow it alongside the actual tool schema. Use a fallback only within the same requested scope, permissions and data granularity; otherwise explain the capability limit. Do not broaden a limited query into private storage inspection.',
-        '',
-        '## ⚡ Operating Guidelines (Search First Recommended)',
-        `1. **Search First (Recommended)**: Reuse available tools and exact names already verified in this session. For an unknown capability, search a concrete operation with \`${directoryCall}({ action: "lookup", query: "<operation>" })\`; combine terms to narrow results. Inspect available categories with \`${directoryCall}({ action: "catalog" })\`; \`${directoryCall}({ action: "lookup", category: "<id>" })\` lists candidates without mounting.`,
-        `2. **Mount Exact Names**: Select by task fit, not result order: \`${directoryCall}({ action: "detail", names: ["<exact name>"] })\`; prefix a skill name with \`skill:\` to load guidance. Mount only what you need for the next step rather than broad pages. Check the report for status before continuing.`,
-        isPtcMode ? '3. **Execute via SDK**: Run directory snippets inside `run_code`. Use mounted SDK functions in the next `run_code` turn (`await tools.<name>(args)`). Prefer suitable SDK tools for file/search operations; JavaScript can batch independent calls, transform data or cover operations without a suitable SDK tool. Print only relevant results.' : '3. **Execute**: Invoke mounted native tools directly in subsequent turns using their actual schema (they are native tool calls, not shell commands or JavaScript). Omit unused optional fields. Batch independent reads when supported.',
-        '4. **Focus**: Search for locations before reading large files, then read relevant ranges. Avoid repeated whole-file reads and stop inspecting when evidence is sufficient for the requested task.',
-        `5. **Prune by benefit**: Keep a small reusable surface; do not add a cleanup call after every small read. Unload obsolete expanded sets when context savings justify another call: \`${directoryCall}({ action: "unload", names: ["<obsolete exact name>"] })\`. Use \`${directoryCall}({ action: "reset" })\` only when the expanded surface is no longer useful and no active work needs it.`,
+        `# Diffusion Mode · ${isPtcMode ? 'PTC' : 'Native'}`,
+        'Discover dedicated tools before shell/raw I/O substitutes; locked is not missing. Shell suits Git/build/test or unsupported operations. Keep scope, permissions and data granularity; report limits, never guess private stores.',
+        `Search First (Recommended): one unknown operation → ${directoryCall}({query:"..."}) (terms AND); select by fit → ${directoryCall}({names:["exact"]}). Reuse tools; browse a category once for related operations and mount exact names together. Category lookup only browses; category/* in names mounts whole sets. skill:<name> loads guidance.`,
+        isPtcMode
+          ? 'Inside run_code, first discover/mount SDK file/search tools; do not replace them with Node fs or shell I/O. Call await tools.<name>(args) in the next run_code. Use JS for computation.'
+          : 'Call mounted native tools directly; directory examples are not shell commands.',
+        'Follow schemas/workflows; omit unused fields. Batch independent work safely, preserve dependencies, read relevant ranges and verify results. Report key findings; save lengthy output to files when useful.',
+        'Unload obsolete sets when worth a call; reset only when no active work needs them.',
         ...collaborationGuidance(context?.scope),
       ].join('\n'),
   });
 
-  // Gate noisy global prompt sections (MCP servers, Agent Teams, ops discovery) until their tools are unlocked
+  // Reveal operation instructions with their tools; keep unrelated policy and unknown sections intact.
   ctx.on('system-prompt/assemble', async (assembly, context, next) => {
     const result = await next();
     const agent = context?.scope;
@@ -1102,20 +1108,24 @@ const QUERY_SYNONYMS = {
 
     const membership = teamMembership(agent);
     const fullVisible = viewHook.unfilteredView(agent).visible;
+    const mounted = new Set([...fullVisible.keys()].filter(name => controller.isToolVisible(agent, name)));
+    const capabilityPolicy = { ...policy, initialTools: new Set() };
+    const mountedCategories = new Set([...mounted].map(name => classifyTool(name, capabilityPolicy)));
     const teamUnlocked = Boolean(membership && membership.role !== 'lead') ||
-      teamContextTools.some(name => fullVisible.has(name) && controller.isToolVisible(agent, name));
-    const mcpResUnlocked = controller.isToolVisible(agent, 'list_mcp_resources');
-    const opsDiscUnlocked = controller.isToolVisible(agent, 'ops_discover_tools');
-    const imageUnlocked = controller.isToolVisible(agent, 'generate_image');
-    const taskBoardUnlocked = controller.isToolVisible(agent, 'task_board_list');
-    const sshUnlocked = controller.isToolVisible(agent, 'ssh_list');
-    const memoryUnlocked = controller.isToolVisible(agent, 'openviking_search') || controller.isToolVisible(agent, 'memory_store');
-    const computerUseUnlocked = controller.isToolVisible(agent, 'windows_computer_use_click') || controller.isToolVisible(agent, 'mcp__wincu__windows_computer_use_click');
+      teamContextTools.some(name => mounted.has(name));
+    const mcpResUnlocked = ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource'].some(name => mounted.has(name));
+    const opsDiscUnlocked = mounted.has('ops_discover_tools');
+    const imageUnlocked = mountedCategories.has('image');
+    const imageDefaultsNeeded = ['generate_image', 'generate_images', 'edit_image'].some(name => mounted.has(name));
+    const taskBoardUnlocked = mountedCategories.has('task-board');
+    const sshUnlocked = mountedCategories.has('ssh');
+    const memoryUnlocked = mountedCategories.has('memory');
+    const computerUseUnlocked = mountedCategories.has('computer-use');
 
     const isMcpServerUnlocked = serverName => {
       const normalized = `mcp__${String(serverName).replace(/[^A-Za-z0-9_-]/g, '_')}__`;
-      for (const tName of fullVisible.keys()) {
-        if (tName.startsWith(normalized) && controller.isToolVisible(agent, tName)) {
+      for (const tName of mounted) {
+        if (tName.startsWith(normalized)) {
           return true;
         }
       }
@@ -1123,6 +1133,12 @@ const QUERY_SYNONYMS = {
     };
 
     const filteredSections = result.sections.filter(sec => {
+      if (sec.name.startsWith('tool:')) {
+        const tool = sec.name.slice(5);
+        const category = TOOL_PROMPT_CATEGORIES[tool];
+        if (category && ![...CATEGORY_META[category].tools].some(name => mounted.has(name))) return false;
+        if ((fullVisible.has(tool) || CORE_TOOL_NAMES.has(tool)) && !mounted.has(tool)) return false;
+      }
       if (sec.name === 'team:policy' && !teamUnlocked) return false;
       if (sec.name === 'mcp-resource-servers' && !mcpResUnlocked) return false;
       if (sec.name.startsWith('dsh-ops:discovery-tools') && !opsDiscUnlocked) return false;
@@ -1138,9 +1154,12 @@ const QUERY_SYNONYMS = {
       return true;
     });
 
-    const filteredContexts = teamUnlocked
-      ? result.contexts
-      : result.contexts.filter(c => c.name !== 'team:identity');
+    const filteredContexts = result.contexts.filter(c => {
+      if (c.name === 'team:identity' && !teamUnlocked) return false;
+      if (c.name === 'dsh-image-gen:image-defaults' && !imageDefaultsNeeded) return false;
+      if (c.name === 'dsh-image-gen:canvas' && !imageUnlocked) return false;
+      return true;
+    });
 
     return {
       ...result,
