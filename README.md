@@ -1,7 +1,7 @@
 # Diffusion Mode Preset for DeepSeek Harness (扩散模式预设)
 
 <p align="center">
-  <img src="assets/icon-180.png" width="100" height="100" alt="Diffusion Mode Logo" />
+  <img src="assets/dsh-diffusion-preset-header.png" alt="dsh-diffusion-preset Header" width="100%" />
 </p>
 
 <p align="center">
