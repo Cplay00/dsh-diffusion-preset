@@ -71,106 +71,159 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 
 ### 🛠️ 工具速查：`call_directory`
 
-`call_directory` 负责发现与挂载能力；实际业务操作由挂载后的目标工具执行。**检索 → 选择精确名称 → 挂载 → 按目标工具 Schema 调用**。已经可用且名称已确认的工具可以直接复用，无需反复检索或挂载。
+> 💡 **核心心智**：把 `call_directory` 当成你的**“按需能力管家 / 智能应用商店”**。
+> 平时只保留最轻量的基础工具（避免上下文臃肿与模型幻觉）；遇到具体任务时，随时“搜一搜、装上它”，用完随时卸载。
 
-#### 调用入口：Native 与 PTC
+---
 
-| 预设 | 实际调用方式 |
-| :--- | :--- |
-| 标准版（Native） | 模型调用原生工具 `call_directory`，将下表的 JSON 对象作为参数。文中的 `call_directory({...})` 是调用示意，不是 Shell 命令或可直接运行的全局 JavaScript 函数。 |
-| PTC 版 | 模型调用原生工具 `run_code`，在其 `code` 中执行 `await tools.call_directory({...})`。新挂载的 SDK 绑定在**下一次 `run_code`** 中使用。 |
+#### 🌟 30 秒直观上手：最自然的调用三步法
 
-两种入口使用相同目录参数。推荐显式填写 `action`，下表每格都是完整的 JSON 参数对象，可直接用于 Native 调用，或传给 PTC 的 `tools.call_directory`。
+无论人类查阅还是指导模型工作，整个生命周期的核心流程都极其自然：
 
-| 动作 (`action`) | 效果 | JSON 参数 |
+```
+① 搜工具 (lookup)        ② 装工具 (detail)        ③ 去干活 (直接调用)
+   "我需要读文件"      ➜     "把 read 挂载上"    ➜     "调用 read 读取具体路径"
+```
+
+1. **第一步：搜一搜 (`lookup`)** —— 纯只读探索，不改动任何环境状态：
+   ```json
+   {"action": "lookup", "query": "read file"}
+   ```
+2. **第二步：装上它 (`detail`)** —— 从返回的候选中挑出需要的工具，按名字精准挂载：
+   ```json
+   {"action": "detail", "names": ["read"]}
+   ```
+   挂载成功后，系统会贴心返回该工具的**完整参数 Schema**，告诉你下一步该怎么调用。
+3. **第三步：去干活** —— 像调用普通工具一样，直接发起目标工具调用（把具体文件路径等业务参数传给目标工具，而不是传给 `call_directory`）。
+4. **按需收拢 (`unload` / `reset`)** —— 阶段结束后再评估是否卸载；小型、可复用的工具可以保留，不必每次读取后都多调用一次清理。
+
+文件读取、搜索和修改优先使用适合的专用工具；Git、构建、测试等 CLI 操作仍走终端。同一任务可以混用两种方式，例如用 `read` / `edit` 修改文件，再用终端执行 `git diff`。找不到适合的注册工具，或工具无法表达当前操作时，再说明原因并选择回退方式。
+
+---
+
+#### 🎭 两种模式如何调用？Native vs PTC 对照
+
+| 特性 | 标准版 (Native Function Call) | 代码版 (PTC / `run_code`) |
 | :--- | :--- | :--- |
-| `catalog` | 只读查看当前作用域的分类与数量 | `{"action":"catalog"}` |
-| `lookup` | 只读检索候选；不挂载工具、不加载技能正文 | `{"action":"lookup","query":"read file"}` |
-| `detail` | 挂载所选工具，或加载所选技能说明；不执行业务操作 | `{"action":"detail","names":["read"]}` |
-| `unload` | 卸载指定工具，收缩后续可见工具集 | `{"action":"unload","names":["read"]}` |
-| `reset` | 恢复初始工具可见性；不清除对话历史中的技能正文 | `{"action":"reset"}` |
+| **运作模式** | 经典的原生工具调用（对话式一问一答） | 在 JavaScript 沙盒中写代码执行批量操作 |
+| **如何查/挂载** | 发起原生工具调用：`call_directory({...})` | 在 `run_code` 中执行：`await tools.call_directory({...})` |
+| **挂载后如何使用** | **在下一次模型请求中**，直接发起目标工具的 Native Call（例如 `read`），无需用户再发消息 | **在下一次 `run_code` 中**，通过 `await tools.read(...)` 调用新绑定 |
+| **为什么是“下一次”** | Native 模式下当前这一轮模型已在生成，新工具在下一轮才加入工具栏 | PTC 的执行环境在单次 `run_code` 开始时已初始化，动态加载的 SDK 绑定在下一次执行生效 |
 
-#### 最小调用流程
+##### 极简调用代码对照：
 
-**Native**：依次向 `call_directory` 发送以下两个参数对象，每次等待结果后再决定下一步。
+- **Native 示例**：
+  - 第 1 步检索：`call_directory({"action":"lookup","query":"read file"})`
+  - 第 2 步挂载：`call_directory({"action":"detail","names":["read"]})`
+  - 第 3 步执行：直接调用目标工具 `read({"file_path":"src/index.js"})`
+
+- **PTC 示例**（已确认 `read` 存在；未知能力先检索。文件路径和参数以任务及实际 Schema 为准）：
+  - 第一次 `run_code`（挂载）：
+    ```javascript
+    // 动态挂载需要的工具
+    const res = await tools.call_directory({ action: "detail", names: ["read"] });
+    console.log(res.report);
+    ```
+  - 第二次 `run_code`（直接尽情使用）：
+    ```javascript
+    // 此时 tools.read 已经就绪，可配合 JS 逻辑批量处理
+    const content = await tools.read({ file_path: "src/index.js" });
+    console.log(JSON.stringify(content));
+    ```
+
+---
+
+#### 🔍 逐个细致分析：5 大动作 (Actions) 深度剖析
+
+`call_directory` 一共提供 5 个核心动作，分工明确、职责单一：
+
+| 动作 (`action`) | 核心效果 | 典型传参示例 | 适用场景与贴心提示 |
+| :--- | :--- | :--- | :--- |
+| **`lookup`** | **只读检索候选** | `{"action":"lookup","query":"表格 excel"}` | **安全探路**：支持中英文同义词联想、空格多关键词匹配。纯只读，绝不会误挂载任何工具。 |
+| **`detail`** | **精准挂载 / 激活技能** | `{"action":"detail","names":["read"]}` | **解锁能力**：挂载指定工具并立即返回其参数规范；挂载技能则加载专业工作流 SOP 指导。 |
+| **`catalog`** | **查看分类大纲** | `{"action":"catalog"}` | **全局俯瞰**：查看当前环境有哪些能力分类（MCP、Plugin、内置核心等）及各自包含的工具数量。 |
+| **`unload`** | **动态卸载工具** | `{"action":"unload","names":["read"]}` | **减负瘦身**：完成某一特定任务后，将临时引入的大型工具从上下文中卸载，节约 Token。 |
+| **`reset`** | **一键重置初始** | `{"action":"reset"}` | **全局归零**：一键恢复到刚启动时的极简工具集，抹平所有临时变更。 |
+
+##### 细致要点分析：
+1. **`lookup`（只读检索）的细节**：
+   - **多词联合匹配**：空格分隔的关键词必须在同一个候选上同时满足。例如 `query: "文档 excel"` 查找同时涉及两者的能力。读取和编辑是不同操作，不要简单拼成 `read edit file`；可分别检索，或浏览文件分类后选择所需工具。
+   - **中英文同义词自动联想**：搜 `"表格"` 会自动关联 `excel`、`xlsx`、`sheet`；搜 `"爬虫"` 会自动关联 `crawl`、`tavily`。
+   - **平滑分页**：默认返回前 20 条，通过 `limit` 与 `offset` 进行翻页（例如 `{"action":"lookup","query":"read","offset":20}`）。
+2. **`detail`（挂载）的细节**：
+   - **单工具精准挂载（首选推荐）**：如 `names: ["read"]`。系统会返回该工具的完整参数 Schema，此时模型在下一步就可以精准传参，无需猜测。
+   - **加载领域技能 ([Skill])**：当检索结果标有 `[Skill]` 时，在名称前加上 `skill:` 前缀传入（如 `names: ["skill:docx"]`），系统会返回该技能的专业 SOP 流程指南。
+   - **整类与通配符挂载（高级批量操作）**：若明确需要某分类的全部工具，可以传分类全名 `names: ["mcp:tavily"]` 或通配符 `names: ["vendor_*"]`，甚至 `names: ["*"]` 全开。建议按需使用，避免一次性涌入过多工具造成上下文拥挤。
+3. **`unload` 与 `reset`（收拢）的细节**：
+   - 按收益收拢，无需在每次微小操作后频繁卸载；在某个完整阶段（如完成了逆向分析、网页抓取等）结束后顺手卸载，收益最高。
+
+---
+
+#### 📋 参数规格与智能推断规则
+
+`call_directory` 的参数设计兼顾了规范性与极大的人性化容错（即使不写 `action` 也能心领神会）：
+
+| 字段 | 类型 | 作用说明 | 智能默认 / 缺省行为 |
+| :--- | :--- | :--- | :--- |
+| **`action`** | `string` | 显式指定五种动作之一；显式动作优先。 | **省略时自动推断**：<br>• 非空 `names` ➜ `detail`（挂载）<br>• 否则非空 `query` 或 `category` ➜ `lookup`（检索）<br>• 均未提供 ➜ `catalog`（大纲） |
+| **`query`** | `string` | 搜索关键词（如 `"git commit"`、`"文档"`）。 | 仅用于 `lookup` 检索，支持中英文同义词。 |
+| **`names`** | `string[]` 或 `string` | 要挂载或卸载的能力名称，如 `["read"]`、`["skill:docx"]`。 | 建议使用数组。非空名称优先于 `category`；`lookup` / `catalog` 忽略此字段。业务参数传给目标工具。 |
+| **`category`** | `string` | 分类过滤 ID 或别名（如 `"core:file"`、`"mcp"`）。 | 在 `lookup` 时作为分类过滤条件；在 `detail`/`unload` 且未提供 `names` 时作为整类操作目标。 |
+| **`offset`** | `integer` | 翻页偏移量（从 0 开始，默认为 0）。 | 仅在 `lookup` 时生效。 |
+| **`limit`** | `integer` | 每页返回的候选数量上限（默认 20）。 | 仅在 `lookup` 时生效，带关键词时上限 20，无关键词分类浏览时上限 100。 |
+
+> 💡 **贴心提示**：所有字段均可省略，用不到的字段直接不写即可，无需传入空字符串或空数组。
+
+---
+
+#### 🗺️ 常用分类与中英文别名速查表 (Aliases Cheat Sheet)
+
+以下是默认的分类别名，可由配置替换；对应服务是否可用，以当前目录为准。工具精确名称与别名重名时，精确名称优先。
+
+| 常用中英文别名 (Aliases) | 规范分类 ID | 包含的核心能力与用途 |
+| :--- | :--- | :--- |
+| `fs` / `file` / `文件` / `代码` | `core:file` | 基础文件读写、路径解析、工作目录操作 |
+| `文件搜索` / `代码搜索` | `core:search` | 文件名查找、代码正则检索 (Grep) |
+| `task` / `todo` / `任务` / `待办` / `计划` | `core:task` | 任务规划、澄清与待办管理 (`core:goal`/`job`/`schedule`) |
+| `subagent` / `子智能体` | `core:subagent` | 独立子智能体派发与委托 (`subagent`, `subagent_fork`) |
+| `team` / `teams` / `团队` | `core:team` | 多 Agent 团队协作与任务板 (`spawn_teammate` 等) |
+| `terminal` / `终端` / `shell` | `core:terminal` | 交互式终端会话与长命令执行 |
+| `web` / `search` / `网页` / `搜索` | `core:web` | 网页搜索、网页内容与正文提取 |
+| `dev` / `git` / `worktree` | `core:dev` | Git 工作树操作与宿主管理；普通 Git 命令仍可使用终端 |
+| `office` / `univer` / `文档` / `表格` | `plugin:univer` | Univer 办公套件、Word/Excel 深度交互与文档渲染 |
+| `browser` / `chrome` / `浏览器` | `plugin:browser` | 会话内浏览器自动化与页面操作 |
+| `image` / `canvas` / `图片` / `生图` | `plugin:image-gen` | AI 图像生成、图像编辑与无限画布工作台 |
+| `memory` / `记忆` / `持久化` | `plugin:memory` | 跨会话持久化知识库与记忆图谱 |
+| `market` / `插件市场` | `plugin:market` | DSH 插件市场浏览、安装与更新管理 |
+| `ssh` / `远程` / `服务器` | `plugin:ssh` | SSH 远程主机连接、终端与集群管理 |
+| `taskboard` / `看板` | `plugin:task-board` | 项目任务看板与 GitHub 集成 |
+| `tavily` / `crawl` / `爬虫` / `调研` | `mcp:tavily` | Tavily AI 搜索引擎、结构化爬虫与深度调研 |
+| `rea` / `reverse` / `逆向` / `反编译` | `mcp:rea` | 二进制逆向工程、静态反编译与固件分析 |
+| `design` / `opendesign` / `设计` / `原型` | `mcp:open-design` | OpenDesign UI/UX 设计系统、原型复刻与设计资产提取 |
+
+---
+
+#### 📦 返回值结构与诊断解读 (Response & Report)
+
+每次调用 `call_directory`，都会返回一个标准的对象结构。无论人类还是 LLM，**直接阅读 `report` 字段即可获取最直观的信息**：
 
 ```json
-{"action":"lookup","query":"read file"}
+{
+  "stage": "detail",
+  "unlocked": ["read"],
+  "unloaded": [],
+  "loadedSkills": [],
+  "report": "..."
+}
 ```
 
-从候选中确认 `read` 存在且符合任务后，只挂载它：
-
-```json
-{"action":"detail","names":["read"]}
-```
-
-挂载成功后，按 DSH 新提供的 `read` 参数 Schema 发起一次独立的原生工具调用。`names` 只放能力名称，文件路径等业务参数应传给 `read`。
-
-**PTC**：下面两段分别放入两次 `run_code` 的 `code` 字段，每次读取输出后再继续。
-
-```javascript
-// 第一次 run_code：只读检索。
-const result = await tools.call_directory({ action: "lookup", query: "read file" });
-console.log(result.report);
-```
-
-```javascript
-// 第二次 run_code：确认候选后挂载精确工具。
-const result = await tools.call_directory({ action: "detail", names: ["read"] });
-console.log(result.report);
-```
-
-第三次 `run_code` 才使用新绑定 `await tools.read(...)`，业务参数遵循实际 Schema。名称不能用 JavaScript 点号访问时，使用 `await tools["准确工具名"](...)`。这里的 `...` 是说明占位符，不能作为实际参数原样提交。
-
-#### 参数与判定规则
-
-| 参数 | 类型与用途 |
-| :--- | :--- |
-| `action` | 可选字符串，仅支持上表五个值；显式指定时优先于自动推断。 |
-| `query` | 可选字符串，仅用于检索关键词，不是挂载目标。 |
-| `category` | 可选字符串。`lookup` 时限定分类；`detail` / `unload` 时，仅在没有非空 `names` 时选择整类。 |
-| `names` | 建议始终使用字符串数组，如 `["read"]`；也兼容单个字符串。精确名称优先于别名，多个名称只应包含下一步确需的能力。 |
-| `offset` / `limit` | 可选整数，仅用于 `lookup`。`offset` 从 0 开始，默认 0；`limit` 默认 20，关键词检索上限 20，无关键词的分类浏览上限 100。按返回的翻页提示继续查询。 |
-
-所有参数均可省略；未使用的字段直接省略，不要填空字符串。省略 `action` 时，非空 `names` 推断为 `detail`；否则非空 `query` 或 `category` 推断为 `lookup`；均未提供时为 `catalog`。例如 `{"query":"git"}` 是只读检索，`{"names":["read"]}` 是挂载。显式 `{"action":"lookup","names":["read"]}` 仍只检索；要按名称搜索，应使用 `query`。
-
-每次返回 `stage`（实际动作）、`unlocked`（挂载状态记录）、`unloaded`、`loadedSkills` 和可读的 `report`。重复挂载可包含已可用项；全量挂载可用 `"*"` 记录，因此 `unlocked` 的长度不等于新增工具数。以 `report` 中的新增/已可用、未找到、歧义或技能加载失败提示判断结果；返回成功不代表所有请求名称都匹配成功。
-
-加载技能时，将检索结果中标为 `[Skill]` 的准确名称加上 `skill:` 前缀后放入 `names`，例如 `skill:my-review`（名称仅作示例，须以当前结果为准）。返回的技能正文是工作指引，默认不会自动挂载领域工具；技能要求的工具再按需选择。
-
-**整类与通配符属于显式批量操作**：`{"action":"lookup","category":"core:file"}` 只浏览；`{"action":"detail","names":["core:file"]}` 挂载整类。`names: ["fs"]`、`names: ["vendor_*"]`、`names: ["*"]` 也可能一次展开多个工具，不应把检索结果整页直接塞进 `names`。卸载同样优先使用精确工具名。
-
-#### 常用分类别名 (Aliases，支持中英文)
-
-以下是默认配置的兼容别名，不代表当前环境已安装对应能力；先浏览确认。自定义配置可替换别名映射。
-
-- `fs` / `file` / `文件` / `代码` → `core:file`（文件读写与工作目录）；`core:search` 用于文件和代码搜索。
-- `task` / `todo` / `任务` / `待办` / `计划` → `core:task`（规划与澄清）；目标、后台任务、定时任务分别为 `core:goal`、`core:job`、`core:schedule`。
-- `subagent` / `子智能体` → `core:subagent`；团队为 `core:team`，工作流为 `core:workflow`。已注册的精确工具名优先于别名。
-- `terminal` / `终端` → `core:terminal`；`session` / `会话` → `core:session`；工作树与宿主管理仍为 `core:dev`。
-- `web` / `search` / `网页` / `搜索` → `core:web`（网页搜索与正文提取）
-- `dev` / `git` / `worktree` → `core:dev`（Git 工作树与宿主管理）
-- `office` / `univer` / `文档` / `表格` / `办公` → `plugin:univer`（Univer 办公套件与文档处理）
-- `browser` / `chrome` / `浏览器` → `plugin:browser`（会话内浏览器自动化控制）
-- `image` / `canvas` / `图片` / `生图` → `plugin:image-gen`（AI 生图、图片编辑与画布工作台）
-- `memory` / `remember` / `记忆` / `持久化` → `plugin:memory`（跨会话持久化记忆与知识图谱）
-- `market` / `plugin` / `市场` / `插件市场` → `plugin:market`（DSH 插件市场与管理器）
-- `ssh` / `remote` / `远程` / `服务器` → `plugin:ssh`（SSH 远程主机连接与集群操作）
-- `taskboard` / `board` / `看板` → `plugin:task-board`（项目任务看板与 GitHub 集成）
-- `ui` → `plugin:ui`（交互式 HTML/CSS 独立卡片呈现）
-- `tavily` / `crawl` / `爬虫` / `调研` → `mcp:tavily`（Tavily 智能搜索与深度爬虫）
-- `rea` / `reverse` / `逆向` / `反编译` → `mcp:rea`（二进制逆向工程与安全分析）
-- `design` / `opendesign` / `设计` / `原型` → `mcp:open-design`（OpenDesign 设计系统与原型）
-
-检索返回匹配的工具与技能候选（默认每页展示 20 个候选，支持 `limit` 与 `offset` 翻页）。结果优先展示准确名称，随后展示名称前缀及其他匹配，仅包含名称、分类和短摘要，不展开参数 Schema 或技能正文。检索不会改变工具可见性，即使同时传入 `names`，显式 `action: lookup` 也不会挂载。
-
-空格分隔的查询词必须逐个满足；每个词可匹配原文或其同义词，例如 `query: "文档 excel"` 会排除只涉及普通文本读取的候选。英文按单词或标识符片段匹配，避免 `read` 命中 `thread`、`ui` 命中 `build`。`category` 限定实际分类，不再按工具名称片段扩大范围；完整分类 ID 精确匹配，也支持分类别名、分类族（如 `mcp`）和完整后缀。总览仅提供分类入口与数量，完整候选通过分类浏览或关键词检索按需返回。
-
-`query` 为检索关键词，不会作为挂载目标。挂载支持分类别名（如 `names: ["fs"]`）、分类全名（如 `names: ["mcp:tavily"]`）、分类后缀（如 `names: ["tavily"]`、`names: ["vendor"]`）、通配符（如 `names: ["vendor_*"]`）或一键全量展开 `names: ["*"]`。
-
-14 个内置分类在 Native/PTC 下共用，始终按当前作用域实际注册内容生成。默认不会自动展开伴生组，也不会根据技能名称或描述自动挂载领域工具。
-
-挂载或卸载同时传入 `names` 与 `category` 时，以明确的 `names` 为准，不追加分类展开；未提供名称时，显式 `action: "detail"` 仍支持按 `category` 挂载整类。未配置别名的分类后缀必须唯一；例如同时存在 `mcp:vendor` 与 `plugin:vendor` 时，`names: ["vendor"]` 会提示使用完整分类 ID，该歧义项不改变任何工具状态。
+- **`report`（最核心的自然语言摘要）**：
+  - 检索时：展示匹配的工具与技能列表，清晰标注 `[Unlocked]`（已可用）或 `[Locked]`（待挂载），并给出贴心的下一步指引；
+  - 挂载单工具时：展示新解锁工具的**完整参数 Schema**，告知下一步调用该工具的具体参数格式；
+  - 遇到歧义或找不到时：列出相关问题，提示继续检索或使用完整分类 ID；调用成功不代表每个请求名称都已匹配。
+- **`stage`**：实际生效的动作（如 `"lookup"`、`"detail"`）。
+- **`unlocked` / `unloaded`**：挂载或卸载状态记录；可包含已可用项或 `"*"` 全量标记，数组长度不是新增工具数。`reset` 不会清除历史中的技能正文。
+- **`loadedSkills`**：本次加载成功的技能指引列表。
 
 ### ⚙️ 通用配置与兼容边界
 

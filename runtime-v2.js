@@ -503,6 +503,7 @@ const QUERY_SYNONYMS = {
       lines.push(
         '',
         'No matching items found. Suggestions:',
+        '- Each query describes one operation; all its terms must match a single candidate. Search independent steps separately or browse their category.',
         `- Call \`${directoryCall}({ action: "catalog" })\` to inspect available category IDs.`,
         '- Try a shorter or more general search query.'
       );
@@ -528,9 +529,9 @@ const QUERY_SYNONYMS = {
     lines.push(
       '',
       '## Next Step: Select by Task Fit',
-      '- Ranking is not a selection: compare descriptions. Reuse a matching [Unlocked] tool directly.',
-      `- For a selected [Locked] tool, use \`${directoryCall}({ action: "detail", names: ["<selected exact name>"] })\`. For [Skill], prefix its name with \`skill:\` to load guidance.`,
-      '- Replace placeholders with one or more names needed for the next operation, not the whole result page. Mounting does not execute the target.'
+      '- Compare descriptions (Ranking is not a selection). If a matching tool is already **[Unlocked]**, reuse it directly.',
+      `- To mount a **[Locked]** tool: \`${directoryCall}({ action: "detail", names: ["<exact-name>"] })\`. For a **[Skill]**, prefix with \`skill:\` to load its guidance.`,
+      '- Mount only what you need for the immediate next operation. Mounting makes capabilities available; invoke them separately in the next step.'
     );
 
     return lines.join('\n');
@@ -747,9 +748,9 @@ const QUERY_SYNONYMS = {
           `- **Description**: ${tool.description || '(no description)'}`,
           `- **Call Target**: \`${callSyntax}\``,
           isPtcMode
-            ? '- **Execute next**: In the next `run_code`, await this SDK function with an argument object satisfying the schema below.'
-            : '- **Execute next**: Call this native tool separately with a JSON argument object satisfying the schema below; do not run the tool name as JavaScript or a shell command.',
-          '- Only availability changed; no target operation ran. Omit unused optional fields and do not send placeholder arguments.',
+            ? '- **Ready to use**: In the next `run_code`, await this SDK function with an argument object satisfying the schema below.'
+            : '- **Ready to use**: Call this native tool separately with a JSON argument object satisfying the schema below.',
+          '- The tool is now unlocked and available. Supply the required arguments and omit unused optional fields.',
           `- **Parameters**:`,
           formatParameterSchema(tool.parameters)
         );
@@ -889,7 +890,7 @@ const QUERY_SYNONYMS = {
   ctx.tools.register({
     name: 'call_directory',
     description:
-      'Discover and mount capabilities in this session. Reuse available tools; lookup unknown operations, select exact names, then detail to mount tools or load skill guidance. Call the target separately using its schema. Categories/wildcards deliberately expand whole sets; never mount a result page by default. Prefer explicit action.',
+      'Discover dedicated tools before substituting shell commands or raw APIs for supported file, search, edit or service operations. Use "lookup" to search tools/skills, "detail" with exact names to mount tools or load skill guidance, then call the target separately. Reuse available tools. Prefer explicit actions.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -898,17 +899,17 @@ const QUERY_SYNONYMS = {
           type: 'string',
           enum: ['catalog', 'lookup', 'detail', 'unload', 'reset'],
           description:
-            'Explicit action wins: catalog=read-only overview; lookup=read-only candidates; detail=mount tools/load skill guidance, not execute them; unload=prune selected tools; reset=restore initial tool visibility, not erase history. If omitted: non-empty names -> detail, else query/category -> lookup, else catalog.',
+            'Choose catalog (read-only overview), lookup (read-only candidates), detail (mount tools/load skill guidance), unload (prune tools) or reset (restore initial tools, keeping history). An explicit action takes priority. If omitted, non-empty names selects detail; otherwise query/category selects lookup; otherwise catalog.',
         },
         category: {
           type: 'string',
           description:
-            'Lookup filter: registered category ID, alias, family or full suffix. With detail/unload, selects a whole category only without non-empty names. Prefer exact names to whole-category changes.',
+            'Lookup filter: registered category ID, alias, family or full suffix, e.g. "core:file" or "mcp". With detail/unload, selects a whole category only without non-empty names.',
         },
         query: {
           type: 'string',
           description:
-            'Lookup only: a concrete operation to search in names, categories and descriptions, not a mount target. Case-insensitive; space-separated terms must all match, with synonyms per term. Does not load skill bodies or mount tools.',
+            'Lookup one operation, e.g. "read file". Every space-separated term must match the same candidate, with synonym support; search independent operations separately. Searches names, categories and descriptions without mounting capabilities.',
         },
         offset: {
           type: 'integer',
@@ -920,7 +921,7 @@ const QUERY_SYNONYMS = {
         },
         names: {
           description:
-            'Prefer an array of exact names needed next, e.g. ["read"]. For skill guidance use ["skill:<registered name>"]. Used by detail/unload, ignored by lookup/catalog. Non-empty names override category. Aliases/categories/wildcards expand whole sets; category suffixes must be unique. Do not put business arguments here.',
+            'Prefer exact names needed next, e.g. ["read"] or ["skill:<registered name>"]. For detail/unload, non-empty names override category; lookup/catalog ignore names. Aliases/categories/wildcards select whole sets; suffixes must be unique. Business arguments belong to the target call.',
           oneOf: [
             { type: 'array', items: { type: 'string' } },
             { type: 'string' },
@@ -1052,10 +1053,12 @@ const QUERY_SYNONYMS = {
         '',
         'The current session runs in **Diffusion Mode**, starting with minimal essential tools and progressively expanding on demand to keep context lean and focused.',
         '',
+        '**Choose per operation**: Prefer a registered dedicated tool for supported work, including file reading, searching and editing. Discover and mount it before replacing it with shell commands, Node/Python scripts or raw filesystem APIs. Use a shell, when available, for actual CLI work such as Git, builds and tests, or operations without a suitable registered tool. A CLI step does not make shell the right route for the task\'s file operations. Search one operation per query: its terms constrain a single candidate. If no suitable tool is found or its contract cannot express the operation, use the appropriate fallback and briefly state why.',
+        '',
         '## ⚡ Operating Guidelines (Search First Recommended)',
         `1. **Search First (Recommended)**: Reuse available tools and exact names already verified in this session. For an unknown capability, search a concrete operation with \`${directoryCall}({ action: "lookup", query: "<operation>" })\`; combine terms to narrow results. Inspect available categories with \`${directoryCall}({ action: "catalog" })\`; \`${directoryCall}({ action: "lookup", category: "<id>" })\` lists candidates without mounting.`,
-        `2. **Mount Exact Names**: Select by task fit, not result order: \`${directoryCall}({ action: "detail", names: ["<exact name>"] })\`; prefix a skill name with \`skill:\` to load guidance. Do not mount a result page. Categories/wildcards select whole sets. Read the report for unmatched names or failures before continuing.`,
-        isPtcMode ? '3. **Execute via SDK**: Run directory snippets inside `run_code`. Use the selected SDK function in the next `run_code` after mounting: await tools.name(args), or await tools["exact-name"](args) for other names. Follow its actual schema; omit unused optional fields and replace placeholders. Prefer suitable SDK tools for file/search operations; JavaScript can batch independent calls, transform data or cover operations without a suitable SDK tool. Print only relevant results.' : '3. **Execute**: Native examples name a tool and its JSON arguments; they are not shell commands or global JavaScript functions. Invoke the mounted target separately using its actual schema. Omit unused optional fields and replace placeholders; mounting did not execute the target. Batch independent reads when supported.',
+        `2. **Mount Exact Names**: Select by task fit, not result order: \`${directoryCall}({ action: "detail", names: ["<exact name>"] })\`; prefix a skill name with \`skill:\` to load guidance. Mount only what you need for the next step rather than broad pages. Check the report for status before continuing.`,
+        isPtcMode ? '3. **Execute via SDK**: Run directory snippets inside `run_code`. Use mounted SDK functions in the next `run_code` turn (`await tools.<name>(args)`). Prefer suitable SDK tools for file/search operations; JavaScript can batch independent calls, transform data or cover operations without a suitable SDK tool. Print only relevant results.' : '3. **Execute**: Invoke mounted native tools directly in subsequent turns using their actual schema (they are native tool calls, not shell commands or JavaScript). Omit unused optional fields. Batch independent reads when supported.',
         '4. **Focus**: Search for locations before reading large files, then read relevant ranges. Avoid repeated whole-file reads and stop inspecting when evidence is sufficient for the requested task.',
         `5. **Prune by benefit**: Keep a small reusable surface; do not add a cleanup call after every small read. Unload obsolete expanded sets when context savings justify another call: \`${directoryCall}({ action: "unload", names: ["<obsolete exact name>"] })\`. Use \`${directoryCall}({ action: "reset" })\` only when the expanded surface is no longer useful and no active work needs it.`,
         ...collaborationGuidance(context?.scope),

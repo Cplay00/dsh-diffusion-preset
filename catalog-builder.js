@@ -453,9 +453,9 @@ export function firstLineSummary(text, maxLen = 140) {
 export function quickUnlockLines(_inventory, { isPtcMode = false } = {}) {
   const call = isPtcMode ? 'await tools.call_directory' : 'call_directory';
   return [
-    isPtcMode ? '- Run these SDK snippets inside `run_code`; use newly mounted bindings in the next `run_code`.' : '- These are native tool-call examples; send JSON arguments to the named tool, not to a shell or JavaScript runtime.',
+    isPtcMode ? '- Run these SDK snippets inside `run_code`; use newly mounted bindings in the next `run_code`.' : '- These are native tool calls: send JSON arguments to the named tool (they are not shell commands or JavaScript).',
     `- Search a concrete operation with \`${call}({ action: "lookup", query: "<operation>" })\`; lookup never mounts capabilities.`,
-    `- After selecting a matching candidate, mount its exact name with \`${call}({ action: "detail", names: ["<selected name>"] })\`. Replace placeholders; mounting does not execute the target.`,
+    `- After selecting a matching candidate, mount its exact name with \`${call}({ action: "detail", names: ["<selected name>"] })\`. Mounting makes it available; invoke it in your next step.`,
     `- Browse a category with \`${call}({ action: "lookup", category: "<category id>" })\`; reuse matching tools already available.`,
     '- Passing a category or wildcard in names explicitly mounts its whole set; reserve that for tasks requiring the whole set.',
   ];
