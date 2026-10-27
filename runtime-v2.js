@@ -1,7 +1,7 @@
 import {
   buildCompleteInventory, createCatalogPolicy, firstLineSummary,
   getScopeOf, normalizeTokenList, quickUnlockLines, renderSkillContent, unwrapService,
-  inferSkillCompanions, classifyTool, getCategoryGuidance, toolsForSource, CATEGORY_META,
+  inferSkillCompanions, classifyTool, classifyToolSource, getCategoryGuidance, toolsForSource, CATEGORY_META,
 } from './catalog-builder.js';
 
 export const name = 'diffusion-controller';
@@ -433,6 +433,9 @@ const QUERY_SYNONYMS = {
     let rawCat = (args.category ?? '').trim().toLowerCase();
     if (CATEGORY_ALIASES[rawCat]) rawCat = CATEGORY_ALIASES[rawCat].toLowerCase();
     const rawQuery = (args.query ?? '').trim().toLowerCase();
+    const queryCategory = CATEGORY_ALIASES[rawQuery]?.toLowerCase() ?? (inventory.categories.has(rawQuery) ? rawQuery : '');
+    // Initial availability and functional category are independent in search results.
+    const semanticPolicy = { ...policy, initialTools: new Set() };
     const isKeywordSearch = Boolean(rawQuery);
 
     const rawOffset = Number(args.offset);
@@ -462,10 +465,13 @@ const QUERY_SYNONYMS = {
     const includeAllCats = !rawCat || rawCat === 'all' || rawCat === '*';
     const wantSkillsCat = includeAllCats || rawCat === 'skills' || rawCat.startsWith('skill:');
 
-    for (const tool of allToolsMap.values()) {
-      if (tool.category === 'initial') continue;
+    for (const registered of allToolsMap.values()) {
+      const tool = registered.category === 'initial'
+        ? { ...registered, category: classifyTool(registered.name, semanticPolicy), source: classifyToolSource(registered.name, semanticPolicy) }
+        : registered;
       const catMatch =
         includeAllCats ||
+        (rawCat === 'initial' && registered.category === 'initial') ||
         tool.source?.toLowerCase() === rawCat ||
         tool.source?.toLowerCase().split(':')[0] === rawCat ||
         tool.category.toLowerCase() === rawCat ||
@@ -474,7 +480,7 @@ const QUERY_SYNONYMS = {
       if (!catMatch) continue;
       if (rawTokens.length > 0) {
         const hay = searchText(`${tool.name} ${tool.category} ${tool.source ?? ''} ${tool.description}`);
-        if (!matchesQuery(hay)) continue;
+        if (!matchesQuery(hay) && !(queryCategory && (tool.category === queryCategory || tool.source === queryCategory))) continue;
       }
       matchedTools.push(tool);
     }
@@ -493,15 +499,17 @@ const QUERY_SYNONYMS = {
     const rank = item => {
       const nLower = item.name.toLowerCase();
       if (nLower === rawQuery) return 0;
-      if (rawQuery && nLower.startsWith(rawQuery)) return 1;
-      if (!terms.length) return 6;
+      // Exact functional intent precedes incidental words in provider tool names.
+      if (queryCategory && (item.category === queryCategory || item.source === queryCategory)) return 1;
+      if (rawQuery && nLower.startsWith(rawQuery)) return 2;
+      if (!terms.length) return 7;
       const nameText = searchText(item.name);
-      if (terms.every(term => term.original(nameText))) return 2;
+      if (terms.every(term => term.original(nameText))) return 3;
       const catLower = (item.category || '').toLowerCase();
-      if (terms.every(term => term.original(searchText(`${item.name} ${catLower} ${item.description}`)))) return 3;
-      if (matchesQuery(nameText)) return 4;
-      if (matchesQuery(`${nameText} ${catLower}`)) return 5;
-      return 6;
+      if (terms.every(term => term.original(searchText(`${item.name} ${catLower} ${item.description}`)))) return 4;
+      if (matchesQuery(nameText)) return 5;
+      if (matchesQuery(`${nameText} ${catLower}`)) return 6;
+      return 7;
     };
     const matches = [
       ...matchedTools.map(item => ({ ...item, kind: 'tool' })),
@@ -922,7 +930,7 @@ const QUERY_SYNONYMS = {
   ctx.tools.register({
     name: 'call_directory',
     description:
-      'Discover dedicated tools before substituting shell commands or raw APIs for supported operations. Use "lookup" to find tools/skills and category workflows, "detail" with exact names to mount tools or load skill guidance, then call the target separately. Reuse available tools. Prefer explicit actions.',
+      'Discover additional tools, content sources and skills when useful; available tools can be called directly. Use "lookup" for candidates and category workflows, "detail" with exact names to mount tools or load skill guidance, then call the target separately. Choose tools or shell by task fit. Prefer explicit actions.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -1089,11 +1097,11 @@ const QUERY_SYNONYMS = {
     text: context =>
       [
         `# Diffusion Mode · ${isPtcMode ? 'PTC' : 'Native'}`,
-        `**For more tools or content sources, use ${directoryCall} FIRST.** Initial tools are a subset; discover the needed tools or skills.`,
-        'Discover dedicated tools before shell/raw I/O substitutes; locked is not missing. Shell suits Git/build/test or unsupported operations. Keep scope, permissions and data granularity; report limits, never guess private stores.',
-        `Search First (Recommended): one unknown operation → ${directoryCall}({query:"..."}) (terms AND); select by fit → ${directoryCall}({names:["exact"]}). Reuse tools; browse a category once for related operations and mount exact names together. Category lookup only browses; category/* in names mounts whole sets. skill:<name> loads guidance.`,
+        `**Need more tools or content sources? Prefer ${directoryCall} to discover them.** Reuse available tools directly; no lookup is needed for a known, available operation.`,
+        'Choose by task fit and total cost: dedicated tools suit scoped reads/edits/search; shell suits Git/build/test and useful pipelines; locked is not missing. Keep scope, permissions and data granularity; report limits, never guess private stores.',
+        `Search First (Recommended): unknown operation → ${directoryCall}({query:"..."}) (terms AND); select by fit → ${directoryCall}({names:["exact"]}). Browse a category once for related work. Category lookup only browses; category/* in names mounts whole sets. skill:<name> loads guidance.`,
         isPtcMode
-          ? 'Inside run_code, first discover/mount SDK file/search tools; do not replace them with Node fs or shell I/O. Call await tools.<name>(args) in the next run_code. Use JS for computation.'
+          ? 'Inside run_code, use await tools.<name>(args); newly mounted bindings appear in the next run_code. Prefer SDK tools for scoped I/O; use JS for computation and batching.'
           : 'Call mounted native tools directly; directory examples are not shell commands.',
         'Follow schemas/workflows; omit unused fields. Batch independent work safely, preserve dependencies, read relevant ranges and verify results. Report key findings; save lengthy output to files when useful.',
         'Unload obsolete sets when worth a call; reset only when no active work needs them.',
@@ -1155,7 +1163,7 @@ const QUERY_SYNONYMS = {
       return true;
     });
 
-    const filteredContexts = result.contexts.filter(c => {
+    const filteredContexts = (result.contexts || []).filter(c => {
       if (c.name === 'team:identity' && !teamUnlocked) return false;
       if (c.name === 'dsh-image-gen:image-defaults' && !imageDefaultsNeeded) return false;
       if (c.name === 'dsh-image-gen:canvas' && !imageUnlocked) return false;

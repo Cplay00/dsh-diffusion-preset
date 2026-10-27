@@ -8,6 +8,8 @@ Diffusion Mode provides a progressive disclosure runtime for DeepSeek Harness (D
 
 Start with an operation, then select only the exact capabilities needed:
 
+The default initial surface includes `read`, shell, image reading and `call_directory`, plus the PTC transport when applicable. Only registered tools appear; `initialTools` can replace this set. Reuse available tools directly. The directory is the preferred discovery entry for additional capabilities, not a prerequisite for every operation. Choose scoped tools, CLI commands or useful pipelines by task fit and total cost; routing guidance does not impose a path.
+
 - `call_directory({ query: "<operation>" })`: discover candidates without mounting.
 - `call_directory({ category: "file-search" })`: browse a category without mounting.
 - `call_directory({ names: ["read", "grep"] })`: mount the selected tools.
@@ -15,6 +17,8 @@ Start with an operation, then select only the exact capabilities needed:
 - Categories and wildcards in `names` explicitly expand whole sets. Use them when the task needs that whole set.
 
 Space-separated query terms are combined with AND; translations are alternatives within each term. For example, `query: "文档 excel"` requires document and spreadsheet evidence instead of returning every generic file tool. ASCII words match word/identifier boundaries. Category filters use actual category IDs, aliases, families or exact suffixes; they do not search tool names. The live overview lists categories and counts; use lookup for candidates.
+
+Exact tool names rank first. When a query is an exact functional category or alias, matching category candidates precede incidental name matches; other matches remain accessible through pagination. Initial tools are searchable under their functional category/source and marked `[Unlocked]`; lookup never mounts tools and ranking never selects them.
 
 ---
 

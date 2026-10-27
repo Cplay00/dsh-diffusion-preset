@@ -26,7 +26,7 @@
 3. **极简模式与全量模式难以两全**：纯极简模式无法胜任复杂任务，而标准模式又过于臃肿。
 
 **扩散模式通过「调用目录 → 渐进展开 → 动态收敛」解决了这一困境：**
-- **初始极简**：回合起步时仅开放基础 Shell（Bash/PowerShell）、图片查看器及 `call_directory` 目录中枢，减少首轮工具 Schema 占用（实际节省随环境与配置变化）；
+- **初始极简**：默认开放文本读取 `read`、基础 Shell（Bash/PowerShell）、图片查看器及 `call_directory`；仅实际注册的工具可见，PTC 另保留执行传输工具。简单阅读直接开始，写入、编辑、搜索等能力按需展开；
 - **自适应动态发现**：根据当前 Harness 宿主内实际安装注册的所有可调用内容（内置核心工具、MCP 外部服务、已安装社区插件与领域技能）自适应聚类，无需外部硬编码；
 - **调用前建议先检索 (Search First)**：明确提醒与推荐模型在调用扩展工具前，优先使用 `call_directory({ query: "关键词" })` 检索确认当前环境中确切存在的工具或技能名称，避免盲目猜测；
 - **精确挂载**：默认按工具的精确名称挂载，不自动带出兄弟工具、团队工具或整个插件。技能加载默认只提供说明；伴生依赖与领域推断均可显式配置；
@@ -46,7 +46,7 @@
   - `call_directory({ category: "file-search" })`：只读浏览文件和代码搜索工具。
   - `call_directory({ names: ["read", "grep"] })`：只挂载读取与搜索工具。
   - `call_directory({ names: ["subagent"] })`：已注册同名工具时只挂载它，不带出团队工具。
-  - `call_directory({ names: ["subagent"] })`：显式挂载委派分类；团队与工作流另行选择。
+  - `call_directory({ category: "subagent" })`：只读浏览委派分类，再选择需要的工具；团队与工作流另行选择。
   - `call_directory({ names: ["*"] })`：任务确需全部能力时完整展开。
 - 🔄 **动态卸载收敛**：
   - `call_directory({ action: "unload", names: [...] })`：阶段性任务结束后精准卸载，收缩上下文。
@@ -80,6 +80,8 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 
 无论人类查阅还是指导模型工作，整个生命周期的核心流程都极其自然：
 
+**已有工具直接用，未知能力再发现。** 默认 `read` 可直接读取文本，无需先检索或挂载。下面以 `read` 演示完整协议，适用于自定义初始工具集未包含它，或需要查看完整参数说明的情况；默认配置下可直接跳到第三步。`call_directory` 是扩展能力的优先发现入口，不是每次操作的必经步骤。
+
 ```
 ① 搜工具 (lookup)        ② 装工具 (detail)        ③ 去干活 (直接调用)
    "我需要读文件"      ➜     "把 read 挂载上"    ➜     "调用 read 读取具体路径"
@@ -97,7 +99,7 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 3. **第三步：去干活** —— 像调用普通工具一样，直接发起目标工具调用（把具体文件路径等业务参数传给目标工具，而不是传给 `call_directory`）。
 4. **按需收拢 (`unload` / `reset`)** —— 阶段结束后再评估是否卸载；小型、可复用的工具可以保留，不必每次读取后都多调用一次清理。
 
-文件读取、搜索和修改优先使用适合的专用工具；Git、构建、测试等 CLI 操作仍走终端。同一任务可以混用两种方式，例如用 `read` / `edit` 修改文件，再用终端执行 `git diff`。找不到适合的注册工具，或工具无法表达当前操作时，再说明原因并选择回退方式。
+按任务适配与总成本选择工具：专用工具适合限定范围的读取、搜索和修改；终端适合 Git、构建、测试和有价值的批处理管道。同一任务可以混用，例如用 `read` / `edit` 检查并修改文件，再用终端执行 `git diff`。这些是选择建议，不限制模型必须走某条路径；使用任何方式都须遵守用户范围、宿主权限与验证要求。
 
 #### 按分类获取操作引导
 
@@ -154,7 +156,7 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 | **`lookup`** | **只读检索候选** | `{"action":"lookup","query":"表格 excel"}` | **安全探路**：支持中英文同义词联想、空格多关键词匹配。纯只读，绝不会误挂载任何工具。 |
 | **`detail`** | **精准挂载 / 激活技能** | `{"action":"detail","names":["read"]}` | **解锁能力**：挂载指定工具并立即返回其参数规范；挂载技能则加载专业工作流 SOP 指导。 |
 | **`catalog`** | **查看分类大纲** | `{"action":"catalog"}` | **全局俯瞰**：查看当前环境有哪些功能分类（文件、设计、网页检索等）及各自包含的工具数量。 |
-| **`unload`** | **动态卸载工具** | `{"action":"unload","names":["read"]}` | **减负瘦身**：完成某一特定任务后，将临时引入的大型工具从上下文中卸载，节约 Token。 |
+| **`unload`** | **动态卸载工具** | `{"action":"unload","names":["edit"]}` | **减负瘦身**：卸载临时引入的工具；初始工具保持可用，是否包含 `read` 可通过 `initialTools` 配置。 |
 | **`reset`** | **一键重置初始** | `{"action":"reset"}` | **全局归零**：一键恢复到刚启动时的极简工具集，抹平所有临时变更。 |
 
 ##### 细致要点分析：
@@ -162,6 +164,7 @@ dsh plugin add Cplay00/dsh-diffusion-preset
    - **多词联合匹配**：空格分隔的关键词必须在同一个候选上同时满足。例如 `query: "文档 excel"` 查找同时涉及两者的能力。读取和编辑是不同操作，不要简单拼成 `read edit file`；可分别检索，或浏览文件分类后选择所需工具。
    - **中英文同义词自动联想**：搜 `"表格"` 会自动关联 `excel`、`xlsx`、`sheet`；搜 `"爬虫"` 会自动关联 `crawl`、`tavily`。
    - **平滑分页**：默认返回前 20 条，通过 `limit` 与 `offset` 进行翻页（例如 `{"action":"lookup","query":"read","offset":20}`）。
+   - **按意图排序**：精确工具名优先；关键词恰好是功能分类或别名（如 `file` / `fs`）时，该类候选优先于名称中偶然包含关键词的其他服务。其他匹配仍可分页获取。初始工具也可检索，标为 `[Unlocked]`，无需重复挂载；排序不代替模型选择。
 2. **`detail`（挂载）的细节**：
    - **单工具精准挂载（首选推荐）**：如 `names: ["read"]`。系统会返回该工具的完整参数 Schema，此时模型在下一步就可以精准传参，无需猜测。
    - **加载领域技能 ([Skill])**：当检索结果标有 `[Skill]` 时，在名称前加上 `skill:` 前缀传入（如 `names: ["skill:docx"]`），系统会返回该技能的专业 SOP 流程指南。
@@ -267,7 +270,7 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 
 Native 与 PTC 预设均显式声明工具呈现模式，不受宿主默认模式影响。目录根据当前作用域实际注册的工具与技能生成，不依赖本机用户名、安装目录、模型提供商或固定的 MCP 服务。
 
-效率指引优先复用已验证的名称和已挂载工具，定位后读取相关范围，在证据充分时结束检索。PTC 的目录、翻页、挂载、卸载与守卫提示均使用 `await tools.call_directory(...)`，在 `run_code` 内执行；新挂载的绑定在下一次 `run_code` 使用。指引要求先发现并使用适合该操作的 SDK 工具，JavaScript 用于合并独立调用、处理数据或 SDK 未覆盖的操作，并限制打印内容。这些是模型行为指引，不是对通用代码执行器的隔离或调用次数硬限制。
+效率指引优先复用已验证的名称和已可用工具，定位后读取相关范围，在证据充分时结束检索。PTC 的目录、翻页、挂载、卸载与守卫提示均使用 `await tools.call_directory(...)`，在 `run_code` 内执行；新挂载的绑定在下一次 `run_code` 使用。SDK 工具适合限定范围的操作，JavaScript 适合计算、合并独立调用与处理数据；终端也可按任务适配选择。这些是模型行为建议，不是对通用代码执行器的隔离或调用次数硬限制。
 
 运行时示例优先显式指定 `action`，兼容已有省略写法。检索提醒按任务适配度选择、复用已可用工具；`lookup` 误传 `names` 时会说明该字段被忽略。单工具挂载详情保留完整 JSON 参数 Schema（含嵌套约束），不生成猜测的业务参数；目录返回说明后，目标操作仍须独立调用。
 
@@ -320,7 +323,7 @@ Native 与 PTC 预设均显式声明工具呈现模式，不受宿主默认模�
 
 ```yaml
 mode: native
-initialTools: [bash, pwsh, read_image]
+initialTools: [read, bash, pwsh, read_image]
 companionGroups: []
 skillCompanions:
   my-report-skill: [read, write]
@@ -362,7 +365,7 @@ catalogPath: Diffusion Mode Call Directory.md
 
 Traditional AI agent workflows inject full schemas for dozens of tools and voluminous system instructions upfront. This wastes token budget and disperses model attention on simple tasks.
 
-**Diffusion Mode** starts from a lightweight minimal baseline (shell, image reader, and the `call_directory` nexus), allowing agents to search, mount, and unload toolkits on demand.
+**Diffusion Mode** starts from a lightweight baseline (text reader `read`, shell, image reader, and `call_directory`; PTC also retains its transport). Reuse available tools directly; prefer the directory when more capabilities or content sources are needed. Choose dedicated tools, CLI commands or useful pipelines by task fit and total cost. These are recommendations, not mandatory routing rules. Exact tool names rank first; exact category/alias intent then precedes incidental keyword matches. Initial tools remain searchable as `[Unlocked]` and need no mounting. The initial set is configurable and only registered tools appear.
 
 ### 🌟 Key Highlights
 

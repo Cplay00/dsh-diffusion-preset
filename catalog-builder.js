@@ -1,6 +1,7 @@
 /** Tools that belong to the initial Minimal Mode surface and are always available from step 1. */
 export const INITIAL_TOOLS = new Set([
   'call_directory',
+  'read',
   'bash',
   'pwsh',
   'ops_bash',
@@ -20,7 +21,7 @@ export const CATEGORY_META = {
     source: 'core:file',
     title: 'File Operations',
     summary: 'Read, write and edit files; select the working directory.',
-    guidance: 'Inspect the relevant file range before changing existing content. Choose a targeted edit for a small change, or a write for intentional creation/replacement, then verify the result. Use registered file operations before shell or raw filesystem substitutes.',
+    guidance: 'Inspect the relevant file range before changing existing content. Choose a targeted edit for a small change, or a write for intentional creation/replacement, then verify the result. Prefer registered file operations when they fit; choose shell or batch processing when it better expresses the task.',
     tools: new Set(['read', 'write', 'edit', 'working_directory']),
   },
   'file-search': {
