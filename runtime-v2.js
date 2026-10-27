@@ -1,14 +1,14 @@
 import {
   buildCompleteInventory, createCatalogPolicy, firstLineSummary,
   getScopeOf, normalizeTokenList, quickUnlockLines, renderSkillContent, unwrapService,
-  inferSkillCompanions, classifyTool, classifyToolSource, getCategoryGuidance, toolsForSource, CATEGORY_META,
+  inferSkillCompanions, classifyTool, classifyToolSource, getCategoryGuidance, toolsForSource, CATEGORY_META, PERSISTENT_TERMINAL_TOOLS,
 } from './catalog-builder.js';
 
 export const name = 'diffusion-controller';
 export const inject = ['tools', 'systemPrompt', 'skills', 'workingDirectory'];
 const VIEW_HOOK_SYM = Symbol.for('dsh.diffusion.viewHook.v3');
 // DSH groups some native tool instructions under a shared section name.
-const TOOL_PROMPT_CATEGORIES = { jobs: 'job', pty: 'terminal', 'session-query': 'session', goal: 'goal' };
+const TOOL_PROMPT_TOOLS = { jobs: CATEGORY_META.job.tools, pty: PERSISTENT_TERMINAL_TOOLS, 'session-query': CATEGORY_META.session.tools, goal: CATEGORY_META.goal.tools };
 const CORE_TOOL_NAMES = new Set(Object.values(CATEGORY_META).flatMap(meta => [...meta.tools]));
 
 /** Preserve all registered argument constraints in single-tool detail output. */
@@ -1099,7 +1099,7 @@ const QUERY_SYNONYMS = {
         `# Diffusion Mode · ${isPtcMode ? 'PTC' : 'Native'}`,
         `**Need more tools or content sources? Prefer ${directoryCall} to discover them.** Reuse available tools directly; no lookup is needed for a known, available operation.`,
         'Choose by task fit and total cost: dedicated tools suit scoped reads/edits/search; shell suits Git/build/test and useful pipelines; locked is not missing. Keep scope, permissions and data granularity; report limits, never guess private stores.',
-        `Search First (Recommended): unknown operation → ${directoryCall}({query:"..."}) (terms AND); select by fit → ${directoryCall}({names:["exact"]}). Browse a category once for related work. Category lookup only browses; category/* in names mounts whole sets. skill:<name> loads guidance.`,
+        `Search First (Recommended): unknown operation → ${directoryCall}({query:"..."}) (terms AND); select by fit → ${directoryCall}({names:["exact"]}). Browse a category once for related work. Category lookup only browses; categories/wildcards in names mount whole sets. skill:<name> loads guidance.`,
         isPtcMode
           ? 'Inside run_code, use await tools.<name>(args); newly mounted bindings appear in the next run_code. Prefer SDK tools for scoped I/O; use JS for computation and batching.'
           : 'Call mounted native tools directly; directory examples are not shell commands.',
@@ -1144,8 +1144,8 @@ const QUERY_SYNONYMS = {
     const filteredSections = result.sections.filter(sec => {
       if (sec.name.startsWith('tool:')) {
         const tool = sec.name.slice(5);
-        const category = TOOL_PROMPT_CATEGORIES[tool];
-        if (category && ![...CATEGORY_META[category].tools].some(name => mounted.has(name))) return false;
+        const groupedTools = TOOL_PROMPT_TOOLS[tool];
+        if (groupedTools && ![...groupedTools].some(name => mounted.has(name))) return false;
         if ((fullVisible.has(tool) || CORE_TOOL_NAMES.has(tool)) && !mounted.has(tool)) return false;
       }
       if (sec.name === 'team:policy' && !teamUnlocked) return false;

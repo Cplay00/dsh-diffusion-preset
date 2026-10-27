@@ -68,7 +68,7 @@ The progressive expansion lifecycle consists of four lightweight phases:
 | `reverse-engineering` | `reverse`, `逆向` | Reverse Engineering | Binary and artifact analysis. |
 | `resources` | `resources` | Resources | URI resource and template discovery and reading. |
 | `dev` | `dev`, `git` | Worktrees & Harness Management | Worktrees and inspection of harness services/plugin state. Plugin market operations belong to `market`; ops tools belong to `ops`. |
-| `terminal` | `terminal` | Persistent Terminals | Open, interact with and close terminals. |
+| `terminal` | `terminal`, `shell` | Shell & Terminals | Execute shell commands and manage persistent terminal sessions. |
 | `session` | `session` | Session History | Search and inspect historical events. |
 | `skills` | `skills` | Domain Skills Repository | Complete domain workflows, coding standards, and best practices (Office, design, analysis, etc.). |
 
@@ -104,6 +104,7 @@ See [README configuration](README.md) for replaceable initial tools, categories,
 - Each directory request reads the requesting scope directly. A host snapshot is never substituted for an agent inventory, and tools from a sample agent are not merged into other scopes.
 - Functional categories and known plugin/MCP capabilities include operation recipes. Focused single-category lookup/mount results reveal the relevant recipe; broad mixed results and the initial prompt do not expand every workflow.
 - Recognized native operation sections follow mounted tools, including grouped job, terminal, session-query and goal guidance. Image defaults follow image generation/editing tools; canvas context follows image/canvas capabilities. Unload, removal and scope changes update these instructions as well as schemas.
+- Shell names such as `bash` and `pwsh` belong to `terminal` with source `core:terminal`; configured plugin operations such as `ops_bash` retain their provider identity. Persistent-terminal instructions appear only when a corresponding session control is mounted, not merely because shell execution is available.
 - The constant guide keeps discovery, exact mounting, mode-specific invocation and scope boundaries brief. Collaboration contracts expand when relevant. Unknown sections and host permission/approval policies are preserved; verbosity and call counts are optimization references, never output truncation or permission bypass mechanisms.
 - Unknown services and custom categories receive generic contract-based guidance. Optional `guidance` metadata and `categoryGuidance` overrides customize it without inventing tools, installing services or changing visibility; `categoryGuidance: false` disables recipes.
 - Full unlock supports selective exclusions; Native and PTC directory result metadata persists unlock, unload and reset state.

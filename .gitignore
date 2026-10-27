@@ -23,6 +23,9 @@ test-*.js
 /playwright-report/
 coverage/
 .nyc_output/
+/DIFFUSION-EVALUATION-REPORT.md
+/scripts/audit-*.mjs
+/scripts/run-all-quality-evaluations.mjs
 
 # Host runtime snapshots and verification dumps
 catalog-snapshot.json

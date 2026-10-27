@@ -202,7 +202,7 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 | `task` / `todo` / `任务` / `待办` / `计划` | `task` | 任务规划、澄清与待办管理；目标、后台任务和定时任务分别属于 `goal`、`job`、`schedule` |
 | `subagent` / `子智能体` | `subagent` | 独立子智能体派发与委托 (`subagent`, `subagent_fork`) |
 | `team` / `teams` / `团队` | `team` | 多 Agent 团队协作与任务板 (`spawn_teammate` 等) |
-| `terminal` / `终端` / `shell` | `terminal` | 交互式终端会话与长命令执行 |
+| `terminal` / `终端` / `shell` | `terminal` | Shell 命令执行、交互式终端会话与长命令执行 |
 | `web` / `search` / `tavily` / `crawl` / `extract` / `网页` / `搜索` / `抓取` / `爬虫` / `调研` | `web-search` | 网页搜索、搜索引擎查询、URL 获取、正文提取、站点映射、爬虫与调研；跨提供方统一检索 |
 | `dev` / `git` / `worktree` | `dev` | Git 工作树操作与宿主管理；普通 Git 命令仍可使用终端 |
 | `office` / `univer` / `文档` / `表格` | `office` | 办公文档、表格的读写、交互、渲染与导出 |
@@ -353,6 +353,9 @@ catalogPath: Diffusion Mode Call Directory.md
 - 本地测试脚本、测试报告和缓存不纳入 Git 跟踪，也不随仓库发布。
 - `npm run sync`：仅打印静态架构信息，不连接正在运行的 DSH，也不表示预设已完成实机验证。
 - 真实 DSH 的工具 Schema、SDK 挂载、插件加载兼容性仍应在目标 DSH 版本中验证。
+- 模拟上下文、直接调用工具执行函数或重复运行 fixture，只能证明对应单元行为，不能当作真实模型驱动的 Native/PTC 会话。报告应注明代码版本、模式、作用域、证据来源和未验证部分；常驻引导长度以实际组装并发送的内容为准。
+- 判断可用状态时，比较调用当时的工具声明、目录结果和挂载事件；当前可见工具可能来自后续挂载，不能据此反推初始工具集。
+- 常驻引导约 1,200 字符、小任务总调用不超过 20 次、额外挂载不超过 5 个可作优化参考，不是硬门槛；最终回复不设字符限制，也不为减少调用而省略必要验证。
 
 ---
 

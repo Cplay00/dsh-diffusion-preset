@@ -15,6 +15,11 @@ export const INITIAL_TOOLS = new Set([
 /** Automatic sibling mounting is opt-in; exact names stay exact by default. */
 export const COMPANION_GROUPS = [];
 
+/** Persistent-session instructions apply only to these controls, not ordinary shell execution. */
+export const PERSISTENT_TERMINAL_TOOLS = new Set([
+  'terminal_open', 'terminal_send', 'terminal_read', 'terminal_signal', 'terminal_close', 'terminal_list',
+]);
+
 /** Static metadata for core categories and known plugin/MCP families. */
 export const CATEGORY_META = {
   'file': {
@@ -58,7 +63,7 @@ export const CATEGORY_META = {
   },
   'skill': {
     source: 'core:skill',
-    title: 'Skill Loader & Runtime Dependencies (Skill Loader & Runtime Dependencies)',
+    title: 'Skill Loader & Runtime Dependencies',
     summary: 'Load domain skill instructions (skill), and resolve built-in Python/Node/pnpm and Office runtime paths (load_workspace_dependencies).',
     guidance: 'Load the relevant registered skill and follow it within user/workspace rules. Resolve runtime dependencies through the registered resolver when needed; use returned paths rather than guessed installations. Skill instructions and runtime discovery do not automatically mount domain tools.',
     tools: new Set(['skill', 'load_workspace_dependencies']),
@@ -114,10 +119,10 @@ export const CATEGORY_META = {
   },
   'terminal': {
     source: 'core:terminal',
-    title: 'Persistent Terminals',
-    summary: 'Open, interact with and close persistent terminals.',
-    guidance: 'Use a persistent terminal for interactive or long-lived CLI work. Reuse the correct session, inspect output and wait for command completion before interpreting results; close only the relevant session. Keep supported file/service operations on their dedicated tools.',
-    tools: new Set(['terminal_open', 'terminal_send', 'terminal_read', 'terminal_signal', 'terminal_close', 'terminal_list']),
+    title: 'Shell & Terminals',
+    summary: 'Execute shell commands and manage persistent terminal sessions.',
+    guidance: 'Choose shell for CLI work or useful pipelines, and dedicated tools for scoped operations when they fit better. Use persistent sessions for interactive or long-lived work; reuse the correct session, inspect output and verify completion. Close only the relevant session. Preserve the actual target, scope and permissions whichever route you choose.',
+    tools: new Set(['bash', 'pwsh', 'persistent_bash', 'persistent_pwsh', ...PERSISTENT_TERMINAL_TOOLS]),
   },
   'session': {
     source: 'core:session',
@@ -468,7 +473,7 @@ export const KNOWN_PLUGIN_FAMILIES = [
     prefix: 'ops_',
     title: 'Batch Operations & Tool Discovery (DSH Ops)',
     summary: 'Batch file reading, real-time tool discovery, and operations shell commands.',
-    guidance: 'Choose a supported batch operation for independent work and bound its inputs/output. Discovery returns candidates, not an instruction to mount or execute them all. Shell operations still follow the per-operation dedicated-tool preference.',
+    guidance: 'Choose a supported batch operation for independent work and bound its inputs/output. Discovery returns candidates, not an instruction to mount or execute them all. Choose shell or dedicated operations by task fit and total cost, preserving the actual target, scope and permissions.',
   },
   {
     id: 'computer-use',
@@ -588,9 +593,9 @@ export function getCategoryGuidance(category, policy) {
   }
   if (typeof category.guidance === 'string' && category.guidance.trim()) return category.guidance.trim();
   if (category.kind === 'skill') return 'Select a relevant registered skill and load its instructions by exact name. Follow user/workspace rules, then discover any tools the workflow needs; loading a skill does not execute the task or mount an entire domain.';
-  if (category.kind === 'mcp') return 'Inspect this server\'s registered tool descriptions, schemas and resource contracts. Choose the exact operation for the requested service/target and verify its result before using shell or raw HTTP substitutes. If the service is unavailable, report that state and choose a suitable available alternative without guessing credentials or endpoints.';
-  if (category.kind === 'plugin') return 'Inspect the plugin\'s registered operations and select the smallest set matching the task. Identify the actual target/state before a change, follow its schema and verify the result. Use a fallback only when no suitable registered operation can express the task.';
-  return 'Use this category\'s actual descriptions and schemas to choose the operation for the task. Inspect the relevant state before a change and verify the outcome; fall back only when the registered operations are unsuitable or unavailable.';
+  if (category.kind === 'mcp') return 'Inspect this server\'s registered tool descriptions, schemas and resource contracts. Choose an exact operation or a suitable alternative by task fit and total cost; preserve the requested service/target, scope and permissions, and verify the result. Report unavailable services without guessing credentials or endpoints.';
+  if (category.kind === 'plugin') return 'Inspect the plugin\'s registered operations and select the smallest set matching the task. Identify the actual target/state before a change, follow its schema and verify the result. Choose registered operations or suitable alternatives by task fit and total cost, preserving the target, scope and permissions.';
+  return 'Use this category\'s actual descriptions and schemas to choose the operation for the task. Inspect relevant state before a change and verify the outcome. Choose operations or suitable alternatives by task fit and total cost, preserving the target, scope and permissions.';
 }
 
 export function unwrapService(service) {
