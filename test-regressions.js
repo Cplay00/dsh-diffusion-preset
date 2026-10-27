@@ -538,7 +538,7 @@ test('inferSkillCompanions can be disabled via config', async t => {
   assert(!h.visible(agent).includes('load_workspace_dependencies'));
 });
 
-test('union parameter schema (oneOf/anyOf) does not falsely mark mutually exclusive branch fields as required', async t => {
+test('union parameter schema preserves mutually exclusive branch requirements', async t => {
   const h = harness(t, {}, { names: ['union_tool'] });
   const agent = h.agent();
   h.definitions.set('union_tool', {
@@ -552,10 +552,30 @@ test('union parameter schema (oneOf/anyOf) does not falsely mark mutually exclus
     }
   });
   const res = await h.call(agent, { names: ['union_tool'] });
-  assert.match(res.report, /`file_path` \(string, optional\)/);
-  assert.match(res.report, /`url` \(string, optional\)/);
-  assert.doesNotMatch(res.report, /`file_path` \(string, required\)/);
-  assert.doesNotMatch(res.report, /`url` \(string, required\)/);
+  const displayed = res.report.match(/```json\n([\s\S]*?)\n```/);
+  assert(displayed, 'composed schemas must be shown without flattening');
+  assert.deepEqual(JSON.parse(displayed[1]), h.definitions.get('union_tool').parameters);
+});
+
+test('composed schema guidance preserves empty branches, required-only branches and discriminators', async t => {
+  const h = harness(t, {}, { names: ['composed_tool'] });
+  const agent = h.agent();
+  const variants = [
+    { type: 'object', anyOf: [{ properties: { path: { type: 'string' } }, required: ['path'] }, {}] },
+    { type: 'object', properties: { path: { type: 'string' } }, allOf: [{ required: ['path'] }] },
+    { type: 'object', oneOf: [
+      { properties: { op: { const: 'read' }, path: { type: 'string' } }, required: ['op', 'path'] },
+      { properties: { op: { const: 'write' }, content: { type: 'string' } }, required: ['op', 'content'] },
+    ] },
+    { type: 'object', properties: { target: { anyOf: [{ type: 'string' }, { type: 'number' }] } } },
+  ];
+  for (const parameters of variants) {
+    h.definitions.set('composed_tool', { name: 'composed_tool', parameters });
+    const res = await h.call(agent, { names: ['composed_tool'] });
+    const displayed = res.report.match(/```json\n([\s\S]*?)\n```/);
+    assert(displayed, 'full schema must be available for composed parameters');
+    assert.deepEqual(JSON.parse(displayed[1]), parameters);
+  }
 });
 
 test('native skill tool callback triggers identical companion expansion with categories and inference', async t => {
@@ -573,6 +593,47 @@ test('native skill tool callback triggers identical companion expansion with cat
   assert(h.visible(agent).includes('browser_navigate'));
   assert(h.visible(agent).includes('browser_click'));
 });
+
+for (const mode of ['native', 'ptc']) {
+  for (const action of ['reset', 'unload', 'replayed reset', 'dispose']) {
+    test(`${mode}: delayed skill result cannot override ${action}`, async t => {
+      const h = harness(t, { mode }, { names: ['skill', 'browser_navigate', 'browser_click'] });
+      const agent = h.agent();
+      h.skillDefs.set('kimi-webbridge', { name: 'kimi-webbridge', description: 'Control browser', content: 'Instructions' });
+      let release;
+      const blocked = new Promise(resolve => { release = resolve; });
+      let started;
+      const loading = new Promise(resolve => { started = resolve; });
+      h.ctx.skills.get = async name => { started(); await blocked; return h.skillDefs.get(name); };
+      let changes = 0;
+      h.ctx.on('tools/change', () => { changes++; });
+      // DSH notifyResult observes the returned promise for errors but does not await it.
+      const pending = h.hooks.get('tools/result')[0](
+        { agent, name: 'skill', arguments: { name: 'kimi-webbridge' } }, { isError: false },
+      );
+      await loading;
+      let changesAfterPruning;
+      try {
+        if (action === 'replayed reset') {
+          agent.events.push({ type: mode === 'ptc' ? 'tool/ptc-dispatch' : 'tool/result', data: { meta: { diffusionUnloaded: ['*'] } } });
+        } else if (action === 'dispose') {
+          h.dispose();
+        } else {
+          await h.call(agent, { action, names: action === 'unload' ? ['browser_navigate'] : undefined });
+        }
+        changesAfterPruning = changes;
+      } finally {
+        release();
+        await pending;
+      }
+      assert.equal(changes, changesAfterPruning, 'late callback must not publish a tools/change');
+      if (action !== 'dispose') {
+        assert(!h.visible(agent).includes('browser_navigate'));
+        assert(!h.visible(agent).includes('browser_click'));
+      }
+    });
+  }
+}
 
 test('keyword search caps at 20 items and requires no default limit parameters', async t => {
   const h = harness(t, {}, {

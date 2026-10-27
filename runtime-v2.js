@@ -11,34 +11,16 @@ const VIEW_HOOK_SYM = Symbol.for('dsh.diffusion.viewHook.v3');
 /** Format a JSON Schema parameter property for human/LLM-readable detail output. */
 function formatParameterSchema(parameters) {
   if (!parameters || typeof parameters !== 'object') return '  (No parameters)';
-  let props = { ...(parameters.properties ?? {}) };
-  const required = new Set(Array.isArray(parameters.required) ? parameters.required : []);
-
-  if (Array.isArray(parameters.allOf)) {
-    for (const b of parameters.allOf) {
-      if (b && typeof b === 'object' && b.properties) {
-        props = { ...props, ...b.properties };
-        if (Array.isArray(b.required)) {
-          for (const r of b.required) required.add(r);
-        }
-      }
-    }
-  } else if (Array.isArray(parameters.oneOf) || Array.isArray(parameters.anyOf)) {
-    const branches = (parameters.oneOf ?? parameters.anyOf).filter(b => b && typeof b === 'object' && b.properties);
-    for (const b of branches) {
-      props = { ...props, ...b.properties };
-    }
-    if (branches.length > 0) {
-      // In oneOf / anyOf, a property is only strictly required if required in ALL branches
-      for (const key of Object.keys(props)) {
-        if (required.has(key)) continue;
-        const requiredInAll = branches.every(b => Array.isArray(b.required) && b.required.includes(key));
-        if (requiredInAll) {
-          required.add(key);
-        }
-      }
-    }
+  const hasComposition = schema => schema && typeof schema === 'object' && (
+    ['allOf', 'oneOf', 'anyOf'].some(key => Array.isArray(schema[key])) ||
+    Object.values(schema).some(hasComposition)
+  );
+  // Flattening composed schemas loses branch alternatives and required constraints.
+  if (hasComposition(parameters)) {
+    return `Full parameter schema (preserves branch constraints):\n\`\`\`json\n${JSON.stringify(parameters, null, 2)}\n\`\`\``;
   }
+  const props = parameters.properties ?? {};
+  const required = new Set(Array.isArray(parameters.required) ? parameters.required : []);
 
   const keys = Object.keys(props);
   if (keys.length === 0) return '  (No parameters `{}`)';
@@ -230,12 +212,14 @@ export function apply(ctx, config = {}) {
 
   /** Per-agent unlocked state cache, backed by the durable session log. */
   const agentStates = new WeakMap();
+  let disposed = false;
 
   function getAgentState(agent) {
     let state = agentStates.get(agent);
     if (!state) {
       state = {
         seq: 0,
+        pruneRevision: 0,
         logged: new Set(),
         inFlight: new Set(),
         excluded: new Set(),
@@ -277,6 +261,7 @@ export function apply(ctx, config = {}) {
             }
             const unloaded = ev.data?.meta?.diffusionUnloaded;
             if (Array.isArray(unloaded)) {
+              if (unloaded.length > 0) state.pruneRevision++;
               for (const item of unloaded) {
                 if (item === '*') {
                   state.unlockAll = false;
@@ -345,7 +330,10 @@ export function apply(ctx, config = {}) {
     },
   };
 
-  ctx.effect(() => viewHook.register(controller), 'diffusion.viewHook');
+  ctx.effect(() => {
+    const unregister = viewHook.register(controller);
+    return () => { disposed = true; unregister(); };
+  }, 'diffusion.viewHook');
 
   /** Build the complete categorized inventory of tools and skills for an agent or preset scope. */
   async function buildInventory(agentOrScope, signal) {
@@ -888,6 +876,7 @@ const QUERY_SYNONYMS = {
     const unloadedRecord = [];
     if (agent && controller.ownsAgent(agent)) {
       const state = getAgentState(agent);
+      state.pruneRevision++;
       if (isReset) {
         state.unlockAll = false;
         for (const t of state.logged) unloadedRecord.push(t);
@@ -1202,9 +1191,11 @@ const QUERY_SYNONYMS = {
   // Auto-unlock companion tools if the model invokes the `skill` tool directly
   ctx.on('tools/result', async (exec, result) => {
     const agent = exec?.agent;
-    if (result?.isError || !agent || !controller.ownsAgent(agent) || exec?.name !== 'skill') return;
+    if (disposed || result?.isError || !agent || !controller.ownsAgent(agent) || exec?.name !== 'skill') return;
     const skillName = exec?.arguments?.name;
     if (typeof skillName !== 'string') return;
+    const state = getAgentState(agent);
+    const pruneRevision = state.pruneRevision;
 
     let skillObj = null;
     try {
@@ -1223,7 +1214,8 @@ const QUERY_SYNONYMS = {
       policy.companionGroups
     )];
     if (companions.length === 0) return;
-    const state = getAgentState(agent);
+    // Result observers are not awaited by DSH; later pruning must take precedence.
+    if (disposed || getAgentState(agent).pruneRevision !== pruneRevision) return;
     let added = false;
     for (const comp of companions) {
       if (!state.inFlight.has(comp) && !state.logged.has(comp)) {
