@@ -23,7 +23,7 @@ console.log('- [plugin:*] Feature Plugins (Dynamically detected by extension pre
 
 console.log('\n--- Verification Scope ---');
 console.log('Static architecture inspection only. No live DSH preset verification was performed.');
-console.log('Run npm test for local regression checks; validate Native/PTC mounting in a running DSH host.');
+console.log('Validate Native/PTC mounting in a running DSH host. Local tests and reports are not tracked in Git.');
 
 if (existsSync(catalogMdFile)) {
   console.log(`\nFull documentation: ${catalogMdFile}`);

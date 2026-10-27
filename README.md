@@ -190,7 +190,7 @@ catalogPath: Diffusion Mode Call Directory.md
 
 #### 验证范围
 
-- `npm test`：运行模拟 DSH 服务的回归测试，包括工具可见性、作用域隔离、日志恢复、Native/PTC 状态与文件导出保护。
+- 本地测试脚本、测试报告和缓存不纳入 Git 跟踪，也不随仓库发布。
 - `npm run sync`：仅打印静态架构信息，不连接正在运行的 DSH，也不表示预设已完成实机验证。
 - 真实 DSH 的工具 Schema、SDK 挂载、插件加载兼容性仍应在目标 DSH 版本中验证。
 

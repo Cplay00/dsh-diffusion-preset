@@ -92,4 +92,4 @@ See [README configuration](README.md) for replaceable initial tools, categories,
 - Full unlock supports selective exclusions; Native and PTC directory result metadata persists unlock, unload and reset state.
 - Wildcard prefix expansion requires an explicit `*` for both mount and unload.
 - The optional host exporter listens for tool, skill and plugin events. It is disabled by default, resolves the current workspace on refresh, and refuses to overwrite unmanaged files.
-- `npm run sync` is static inspection only. `npm test` exercises mocked host contracts; actual DSH mounting remains a separate integration check.
+- `npm run sync` is static inspection only; actual DSH mounting remains a separate integration check. Local test scripts, reports and caches are excluded from Git.

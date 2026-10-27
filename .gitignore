@@ -7,6 +7,23 @@ yarn-error.log*
 pnpm-debug.log*
 .history/
 
+# Local caches and task attachments
+.cache/
+__pycache__/
+.pytest_cache/
+.codex-remote-attachments/
+
+# Local tests and generated test reports
+test-*.js
+*.test.js
+*.spec.js
+/test/
+/tests/
+/test-results/
+/playwright-report/
+coverage/
+.nyc_output/
+
 # Host runtime snapshots and verification dumps
 catalog-snapshot.json
 preset-status.json
