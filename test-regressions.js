@@ -207,6 +207,16 @@ test('directory state changes cannot be scheduled as concurrency-safe calls', t 
   }
 });
 
+test('explicit directory actions agree across execution and UI presentation', async t => {
+  const h = harness(t);
+  const agent = h.agent();
+  for (const action of ['catalog', 'lookup', 'detail', 'unload', 'reset']) {
+    const args = { action, names: ['read'] };
+    assert.equal((await h.call(agent, args)).stage, action);
+    assert.match(h.tools.directory.presentCall(args).title, new RegExp(`\\(${action}\\)`));
+  }
+});
+
 test('child agents inherit the parent exclusions after full unlock', async t => {
   const h = harness(t);
   const parent = h.agent();

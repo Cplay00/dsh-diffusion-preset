@@ -67,6 +67,13 @@ function expandCompanionTools(toolNames, allToolNames, groups) {
   return expanded;
 }
 
+function directoryStage(args = {}) {
+  if (args.action) return args.action;
+  if (args.unload) return 'unload';
+  if (normalizeTokenList(args.names).length > 0) return 'detail';
+  return args.category?.trim() || args.query?.trim() ? 'lookup' : 'catalog';
+}
+
 /** Install or join the hook where this service actually defines its view. */
 function ensureViewHook(rawTools) {
   let hostObj = rawTools;
@@ -797,19 +804,9 @@ export function apply(ctx, config = {}) {
         diffusionSkills: value.loadedSkills ?? [],
       }),
     },
-    isConcurrencySafe: (args = {}) => {
-      if (args.action) return args.action === 'catalog' || args.action === 'lookup';
-      return !args.unload && normalizeTokenList(args.names).length === 0;
-    },
-    presentCall(args) {
-      const stage =
-        args?.action === 'reset'
-          ? 'reset'
-          : args?.action === 'unload' || args?.unload
-            ? 'unload'
-            : (Array.isArray(args?.names) && args.names.length > 0) || (typeof args?.names === 'string' && args.names.trim())
-              ? 'detail'
-              : args?.action ?? (args?.category || args?.query ? 'lookup' : 'catalog');
+    isConcurrencySafe: args => ['catalog', 'lookup'].includes(directoryStage(args)),
+    presentCall(args = {}) {
+      const stage = directoryStage(args);
       const target =
         args?.action === 'reset'
           ? 'reset-all'
@@ -836,21 +833,7 @@ export function apply(ctx, config = {}) {
       const inventory = await buildInventory(agent ?? presetScopeKey, signal);
 
       const normNames = normalizeTokenList(args.names || args.unload);
-      const hasNames = normNames.length > 0;
-      const hasFilter = Boolean((args.category && args.category.trim()) || (args.query && args.query.trim()));
-
-      let stage = args.action;
-      if (!stage) {
-        if (args.unload) {
-          stage = 'unload';
-        } else if (hasNames) {
-          stage = 'detail';
-        } else if (hasFilter) {
-          stage = 'lookup';
-        } else {
-          stage = 'catalog';
-        }
-      }
+      const stage = directoryStage(args);
 
       if (stage === 'catalog') {
         const report = renderCatalogStage(inventory, agent ?? presetScopeKey);
