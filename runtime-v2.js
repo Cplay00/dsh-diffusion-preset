@@ -339,10 +339,11 @@ export function apply(ctx, config = {}) {
   /** Stage 2: Lookup specific names and descriptions by category and/or keyword query. */
   function renderLookupStage(inventory, args) {
     const { allToolsMap, skills } = inventory;
-    const { offset = 0, limit = 5 } = args;
-    if (!Number.isInteger(offset) || offset < 0 || !Number.isInteger(limit) || limit < 1 || limit > 10) {
-      throw new RangeError('Lookup pagination requires offset >= 0 and limit between 1 and 10, both integers.');
-    }
+    const rawOffset = Number(args.offset);
+    const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
+    const rawLimit = Number(args.limit);
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(100, Math.floor(rawLimit)) : 20;
+
     let rawCat = (args.category ?? '').trim().toLowerCase();
     if (CATEGORY_ALIASES[rawCat]) rawCat = CATEGORY_ALIASES[rawCat].toLowerCase();
     const rawQuery = (args.query ?? '').trim().toLowerCase();
@@ -407,22 +408,22 @@ export function apply(ctx, config = {}) {
     }
 
     if (page.length === 0) {
-      lines.push('', 'No items on this page. Retry with offset: 0 or a smaller offset.');
-      return lines.join('\n');
+      lines.push('', `No items on this page (offset: ${offset}, total matches: ${matches.length}). Retry with offset: 0 or a smaller offset.`);
+    } else {
+      lines.push(`- Showing ${offset + 1}-${offset + page.length} of ${matches.length} matches.`, '', '## Candidates');
+      for (const item of page) {
+        const badge = item.kind === 'skill' ? '[Skill]' : item.unlocked ? '[Unlocked]' : '[Locked]';
+        lines.push(`- \`${item.name}\` ${badge} (${item.category ?? 'skills'}): ${firstLineSummary(item.description, 120)}`);
+      }
+
+      if (offset + page.length < matches.length) {
+        const nextPage = { action: 'lookup', ...(args.category ? { category: args.category } : {}), ...(args.query ? { query: args.query } : {}), offset: offset + limit, limit };
+        lines.push('', `- Next page (lookup only): \`call_directory(${JSON.stringify(nextPage)})\`.`);
+      }
     }
 
-    lines.push(`- Showing ${offset + 1}-${offset + page.length} of ${matches.length} matches.`, '', '## Candidates');
-    for (const item of page) {
-      const badge = item.kind === 'skill' ? '[Skill]' : item.unlocked ? '[Unlocked]' : '[Locked]';
-      lines.push(`- \`${item.name}\` ${badge} (${item.category ?? 'skills'}): ${firstLineSummary(item.description, 120)}`);
-    }
-
-    if (offset + page.length < matches.length) {
-      const nextPage = { action: 'lookup', ...(args.category ? { category: args.category } : {}), ...(args.query ? { query: args.query } : {}), offset: offset + limit, limit };
-      lines.push('', `- Next page (lookup only): \`call_directory(${JSON.stringify(nextPage)})\`.`);
-    }
-
-    const target = page[0].kind === 'skill' ? `skill:${page[0].name}` : page[0].name;
+    const firstItem = page[0] ?? matches[0];
+    const target = firstItem ? (firstItem.kind === 'skill' ? `skill:${firstItem.name}` : firstItem.name) : '<name>';
     lines.push(
       '',
       '## Next Step: Mount Directly',
@@ -499,6 +500,19 @@ export function apply(ctx, config = {}) {
         }
         continue;
       }
+
+      let matchedCategory = false;
+      for (const [catId, cat] of categories.entries()) {
+        if (catId === resolved || catId.endsWith(`:${resolved}`)) {
+          if (cat.kind === 'skill') {
+            if (allToolNames.has('skill')) toolsToUnlock.add('skill');
+          } else {
+            for (const t of cat.tools) toolsToUnlock.add(t.name);
+          }
+          matchedCategory = true;
+        }
+      }
+      if (matchedCategory) continue;
 
       const prefix = resolved.endsWith('*') ? resolved.slice(0, -1) : resolved;
       let matchedAny = false;
@@ -767,12 +781,12 @@ export function apply(ctx, config = {}) {
             'Search keyword (case-insensitive, matched against tool names, skill names, MCP server names, and descriptions).',
         },
         offset: {
-          type: 'integer', minimum: 0,
+          type: 'integer',
           description: 'Lookup only: zero-based result offset. Defaults to 0. Does not mount capabilities.',
         },
         limit: {
-          type: 'integer', minimum: 1, maximum: 10,
-          description: 'Lookup only: combined tool and skill candidates per page. Defaults to 5; maximum 10. No parameter schemas or skill bodies are loaded.',
+          type: 'integer',
+          description: 'Lookup only: combined tool and skill candidates per page. Defaults to 20. No parameter schemas or skill bodies are loaded.',
         },
         names: {
           description:
@@ -888,7 +902,7 @@ export function apply(ctx, config = {}) {
         '   - Inspect available categories with `call_directory()` before selecting a tool or category name.',
         '   - 🎨 Domain Tasks & Skills: Search via `call_directory({ query: "keyword" })` for relevant registered skills',
         '   - 🚀 Full Standard Mode: `call_directory({ names: ["*"] })` to expand all tools',
-        '2. **Explore & Search**: `call_directory({ query: "..." })` only lists candidates (5 per page, at most 10). Use offset to page; then mount only needed exact names. Lookup never mounts tools or loads skill bodies.',
+        '2. **Explore & Search**: `call_directory({ query: "..." })` lists matching candidate tools and skills without parameter schemas or skill bodies. Use offset/limit to page large results, then mount only needed exact names. Lookup never mounts tools or loads skill bodies.',
         '3. **Dynamic Pruning (Unload)**: Remove tool definitions from subsequent requests with `call_directory({ action: "unload", names: [...] })` or `{ action: "reset" }`. Existing conversation history is retained.',
       ].join('\n'),
   });

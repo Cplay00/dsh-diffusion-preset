@@ -77,15 +77,15 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 - `tavily` → `mcp:tavily`（Tavily 智能搜索与深度爬虫）
 - `rea` → `mcp:rea`（二进制逆向工程与安全分析）
 
-检索默认每页返回 **5 个候选**，工具与技能共用同一额度；`limit` 可设为 1–10，`offset` 从 0 开始翻页。结果优先展示准确名称，随后展示名称前缀及其他匹配，仅包含名称、分类和短摘要，不展开参数 Schema 或技能正文。检索不会改变工具可见性，即使同时传入 `names`，显式 `action: lookup` 也不会挂载。
+检索返回匹配的工具与技能候选（默认每页展示 20 个候选，支持 `limit` 与 `offset` 翻页）。结果优先展示准确名称，随后展示名称前缀及其他匹配，仅包含名称、分类和短摘要，不展开参数 Schema 或技能正文。检索不会改变工具可见性，即使同时传入 `names`，显式 `action: lookup` 也不会挂载。
 
 ```javascript
-call_directory({ query: "read" })                  // 只查看前 5 个候选
-call_directory({ query: "read", offset: 5 })       // 只查看下一页
+call_directory({ query: "read" })                  // 查看匹配的候选
+call_directory({ query: "read", offset: 20 })      // 查看下一页
 call_directory({ names: ["read"] })                // 选择后仅挂载 read
 ```
 
-`query` 不会被当作挂载目标，即使指定 `action: detail`。挂载须明确提供 `names` 或 `category`；未知的分类尾缀不再被猜测成整组工具。主动批量展开仍须使用完整分类 ID、已配置别名、显式前缀通配符，或 `names: ["*"]`，与只读检索分开。
+`query` 为检索关键词，不会作为挂载目标。挂载支持分类别名（如 `names: ["fs"]`）、分类全名（如 `names: ["mcp:tavily"]`）、分类后缀（如 `names: ["tavily"]`、`names: ["vendor"]`）、通配符（如 `names: ["vendor_*"]`）或一键全量展开 `names: ["*"]`。
 
 ### ⚙️ 通用配置与兼容边界
 
@@ -163,7 +163,7 @@ Traditional AI agent workflows inject full schemas for dozens of tools and volum
 
 - **Lightweight First-Turn Context**: Reduces upfront tool schemas; actual token savings depend on the installed environment and configuration.
 - **One-Step Mounting**: Quickly mounts domain toolkits via aliases like `names: ["fs", "task"]` or expands completely via `names: ["*"]`.
-- **Bounded, Read-Only Lookup**: Search returns 5 candidates by default (10 maximum per page, shared by tools and skills). Page with `offset`, then mount only the exact names needed. Search keywords never become implicit mount targets.
+- **Efficient, Read-Only Lookup**: Search returns matching candidates with concise summaries (tools and skills shared). Page via `offset` and flexible `limit` without dumping heavy parameter schemas or skill bodies. Search keywords never become implicit mount targets.
 - **Dynamic Unloading**: Supports `action: "unload"` and `action: "reset"` to prune tokens during long-horizon sessions.
 - **Dual Preset Architectures**: Works out-of-the-box in both Native Function Calling and PTC (Programmable Tool Calling) environments.
 - **Scoped Discovery**: Reads the requesting session’s current tools and skills on every directory call. Host catalog file export is opt-in and protects existing user files.
