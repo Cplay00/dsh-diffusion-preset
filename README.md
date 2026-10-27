@@ -41,7 +41,7 @@
 - 🎯 **双预设支持**：同时提供 **扩散模式（标准版）** 与 **扩散模式（PTC 版）**，无缝适配 Native Function Call 与 Programmable Tool Calling。
 - 🔍 **智能搜索与关键词检索 (Search First)**：
   - 调用未知扩展工具前，明确建议先使用 `call_directory({ query: "..." })` 进行检索；
-  - 智能支持中英文同义词（如搜索 `"文档"` 自动联想 `doc`/`docx`/`office`/`univer`/`file`，搜索 `"表格"` 联想 `excel`/`xlsx`/`sheet`，搜索 `"爬虫"` 联想 `crawl`/`tavily` 等）。
+  - 智能支持中英文同义词（如搜索 `"文档"` 自动联想 `doc`/`docx`/`office`/`file`，搜索 `"表格"` 联想 `excel`/`xlsx`/`sheet`，搜索 `"爬虫"` 联想 `crawl`/`tavily` 等）。
 - ⚡ **检索后精准调用**：
   - `call_directory({ category: "core:search" })`：只读浏览文件和代码搜索工具。
   - `call_directory({ names: ["read", "grep"] })`：只挂载读取与搜索工具。
@@ -67,17 +67,83 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 
 ---
 
+<a id="call-directory"></a>
+
 ### 🛠️ 工具速查：`call_directory`
 
-| 动作 (`action`) | 说明 | 示例 |
+`call_directory` 负责发现与挂载能力；实际业务操作由挂载后的目标工具执行。**检索 → 选择精确名称 → 挂载 → 按目标工具 Schema 调用**。已经可用且名称已确认的工具可以直接复用，无需反复检索或挂载。
+
+#### 调用入口：Native 与 PTC
+
+| 预设 | 实际调用方式 |
+| :--- | :--- |
+| 标准版（Native） | 模型调用原生工具 `call_directory`，将下表的 JSON 对象作为参数。文中的 `call_directory({...})` 是调用示意，不是 Shell 命令或可直接运行的全局 JavaScript 函数。 |
+| PTC 版 | 模型调用原生工具 `run_code`，在其 `code` 中执行 `await tools.call_directory({...})`。新挂载的 SDK 绑定在**下一次 `run_code`** 中使用。 |
+
+两种入口使用相同目录参数。推荐显式填写 `action`，下表每格都是完整的 JSON 参数对象，可直接用于 Native 调用，或传给 PTC 的 `tools.call_directory`。
+
+| 动作 (`action`) | 效果 | JSON 参数 |
 | :--- | :--- | :--- |
-| `catalog` | 查看全部分类总览与推荐快捷组合（明确提醒建议先用 query 检索） | `call_directory({ action: "catalog" })` |
-| `lookup` | 只读关键词检索候选（推荐在调用前使用），不挂载工具或加载技能正文 | `call_directory({ query: "git" })` 或 `call_directory({ query: "文档" })` |
-| `detail` | 解锁并挂载指定工具/技能（传 `names` 默认执行） | `call_directory({ names: ["read", "grep"] })` |
-| `unload` | 动态卸载指定工具以收缩上下文 | `call_directory({ action: "unload", names: ["mcp:rea"] })` |
-| `reset` | 重置会话回初始极简状态 | `call_directory({ action: "reset" })` |
+| `catalog` | 只读查看当前作用域的分类与数量 | `{"action":"catalog"}` |
+| `lookup` | 只读检索候选；不挂载工具、不加载技能正文 | `{"action":"lookup","query":"read file"}` |
+| `detail` | 挂载所选工具，或加载所选技能说明；不执行业务操作 | `{"action":"detail","names":["read"]}` |
+| `unload` | 卸载指定工具，收缩后续可见工具集 | `{"action":"unload","names":["read"]}` |
+| `reset` | 恢复初始工具可见性；不清除对话历史中的技能正文 | `{"action":"reset"}` |
+
+#### 最小调用流程
+
+**Native**：依次向 `call_directory` 发送以下两个参数对象，每次等待结果后再决定下一步。
+
+```json
+{"action":"lookup","query":"read file"}
+```
+
+从候选中确认 `read` 存在且符合任务后，只挂载它：
+
+```json
+{"action":"detail","names":["read"]}
+```
+
+挂载成功后，按 DSH 新提供的 `read` 参数 Schema 发起一次独立的原生工具调用。`names` 只放能力名称，文件路径等业务参数应传给 `read`。
+
+**PTC**：下面两段分别放入两次 `run_code` 的 `code` 字段，每次读取输出后再继续。
+
+```javascript
+// 第一次 run_code：只读检索。
+const result = await tools.call_directory({ action: "lookup", query: "read file" });
+console.log(result.report);
+```
+
+```javascript
+// 第二次 run_code：确认候选后挂载精确工具。
+const result = await tools.call_directory({ action: "detail", names: ["read"] });
+console.log(result.report);
+```
+
+第三次 `run_code` 才使用新绑定 `await tools.read(...)`，业务参数遵循实际 Schema。名称不能用 JavaScript 点号访问时，使用 `await tools["准确工具名"](...)`。这里的 `...` 是说明占位符，不能作为实际参数原样提交。
+
+#### 参数与判定规则
+
+| 参数 | 类型与用途 |
+| :--- | :--- |
+| `action` | 可选字符串，仅支持上表五个值；显式指定时优先于自动推断。 |
+| `query` | 可选字符串，仅用于检索关键词，不是挂载目标。 |
+| `category` | 可选字符串。`lookup` 时限定分类；`detail` / `unload` 时，仅在没有非空 `names` 时选择整类。 |
+| `names` | 建议始终使用字符串数组，如 `["read"]`；也兼容单个字符串。精确名称优先于别名，多个名称只应包含下一步确需的能力。 |
+| `offset` / `limit` | 可选整数，仅用于 `lookup`。`offset` 从 0 开始，默认 0；`limit` 默认 20，关键词检索上限 20，无关键词的分类浏览上限 100。按返回的翻页提示继续查询。 |
+
+所有参数均可省略；未使用的字段直接省略，不要填空字符串。省略 `action` 时，非空 `names` 推断为 `detail`；否则非空 `query` 或 `category` 推断为 `lookup`；均未提供时为 `catalog`。例如 `{"query":"git"}` 是只读检索，`{"names":["read"]}` 是挂载。显式 `{"action":"lookup","names":["read"]}` 仍只检索；要按名称搜索，应使用 `query`。
+
+每次返回 `stage`（实际动作）、`unlocked`（挂载状态记录）、`unloaded`、`loadedSkills` 和可读的 `report`。重复挂载可包含已可用项；全量挂载可用 `"*"` 记录，因此 `unlocked` 的长度不等于新增工具数。以 `report` 中的新增/已可用、未找到、歧义或技能加载失败提示判断结果；返回成功不代表所有请求名称都匹配成功。
+
+加载技能时，将检索结果中标为 `[Skill]` 的准确名称加上 `skill:` 前缀后放入 `names`，例如 `skill:my-review`（名称仅作示例，须以当前结果为准）。返回的技能正文是工作指引，默认不会自动挂载领域工具；技能要求的工具再按需选择。
+
+**整类与通配符属于显式批量操作**：`{"action":"lookup","category":"core:file"}` 只浏览；`{"action":"detail","names":["core:file"]}` 挂载整类。`names: ["fs"]`、`names: ["vendor_*"]`、`names: ["*"]` 也可能一次展开多个工具，不应把检索结果整页直接塞进 `names`。卸载同样优先使用精确工具名。
 
 #### 常用分类别名 (Aliases，支持中英文)
+
+以下是默认配置的兼容别名，不代表当前环境已安装对应能力；先浏览确认。自定义配置可替换别名映射。
+
 - `fs` / `file` / `文件` / `代码` → `core:file`（文件读写与工作目录）；`core:search` 用于文件和代码搜索。
 - `task` / `todo` / `任务` / `待办` / `计划` → `core:task`（规划与澄清）；目标、后台任务、定时任务分别为 `core:goal`、`core:job`、`core:schedule`。
 - `subagent` / `子智能体` → `core:subagent`；团队为 `core:team`，工作流为 `core:workflow`。已注册的精确工具名优先于别名。
@@ -100,17 +166,9 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 
 空格分隔的查询词必须逐个满足；每个词可匹配原文或其同义词，例如 `query: "文档 excel"` 会排除只涉及普通文本读取的候选。英文按单词或标识符片段匹配，避免 `read` 命中 `thread`、`ui` 命中 `build`。`category` 限定实际分类，不再按工具名称片段扩大范围；完整分类 ID 精确匹配，也支持分类别名、分类族（如 `mcp`）和完整后缀。总览仅提供分类入口与数量，完整候选通过分类浏览或关键词检索按需返回。
 
-```javascript
-// 💡 强烈建议：调用扩展功能前先进行关键词检索
-call_directory({ query: "git" })                    // 搜索当前环境中与 git 相关的工具与技能
-call_directory({ query: "文档" })                   // 搜索文档、表格与办公套件工具
-call_directory({ query: "read", offset: 20 })       // 查看下一页
-call_directory({ names: ["read"] })                 // 确认后精准挂载 read
-```
-
 `query` 为检索关键词，不会作为挂载目标。挂载支持分类别名（如 `names: ["fs"]`）、分类全名（如 `names: ["mcp:tavily"]`）、分类后缀（如 `names: ["tavily"]`、`names: ["vendor"]`）、通配符（如 `names: ["vendor_*"]`）或一键全量展开 `names: ["*"]`。
 
-`category` 单独使用时仅浏览候选；把分类放入 `names` 则明确要求挂载整类。默认不会自动展开伴生组，也不会根据技能名称或描述自动挂载领域工具。挂载结果会分别列出本次新增数量与已可用数量；挂载不等于执行。14 个内置分类在 Native/PTC 下共用，始终按当前作用域实际注册内容生成；PTC 通过 `run_code` 调用已挂载的 SDK 绑定，不会把所有 SDK 工具变成模型顶层函数。
+14 个内置分类在 Native/PTC 下共用，始终按当前作用域实际注册内容生成。默认不会自动展开伴生组，也不会根据技能名称或描述自动挂载领域工具。
 
 挂载或卸载同时传入 `names` 与 `category` 时，以明确的 `names` 为准，不追加分类展开；未提供名称时，显式 `action: "detail"` 仍支持按 `category` 挂载整类。未配置别名的分类后缀必须唯一；例如同时存在 `mcp:vendor` 与 `plugin:vendor` 时，`names: ["vendor"]` 会提示使用完整分类 ID，该歧义项不改变任何工具状态。
 
@@ -227,6 +285,14 @@ dsh plugin add Cplay00/dsh-diffusion-preset
 ```
 
 Select **"Diffusion Mode"** or **"Diffusion Mode (PTC)"** when launching a session.
+
+### Calling contract
+
+In Native mode, call the registered `call_directory` tool with a JSON argument object. In PTC mode, call `run_code` and execute `await tools.call_directory(args)` inside its `code`; use newly mounted bindings in the **next** `run_code` call.
+
+Use explicit actions for clarity: `{"action":"lookup","query":"read file"}` discovers candidates; `{"action":"detail","names":["read"]}` mounts the selected tool. Then invoke `read` separately using its actual schema. Mounting does not execute a business operation. Categories and wildcards in `names` deliberately select whole sets; choose exact names for precise mounting and unloading.
+
+If `action` is omitted, non-empty `names` selects `detail`, otherwise non-empty `query` or `category` selects `lookup`, otherwise `catalog`. An explicit action takes precedence. Read `report` for unmatched names, ambiguity and skill failures; a successful directory call does not guarantee every requested name matched. See the [full reference](#call-directory) for parameters and examples.
 
 ---
 
