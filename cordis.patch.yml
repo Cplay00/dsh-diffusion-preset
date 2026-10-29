@@ -6,7 +6,7 @@
       config:
         id: diffusion
         name: 扩散模式
-        description: 从极简模式起步，通过“调用目录 → 名称 → 详细命令”按需解锁工具、技能、MCP 与插件，最终完整展开为标准模式。
+        description: 提供可配置初始工具集与调用目录，按会话选择挂载工具、技能、MCP 与插件。
         order: 5
         plugins:
           - id: persona
@@ -55,7 +55,7 @@
                   section: |
                     You are in plan mode. Stay in plan mode until the user approves your plan through exit_plan_mode or switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
 
-                    Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
+                    Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan.
 
                     The tool catalog stays the same across modes for request-cache stability. These plan-mode rules override any later tool description or guidance that suggests using mutation tools; those tools remain listed to keep the tool catalog unchanged. Do not use todo_write to track this planning phase: it tracks implementation after an approved plan, while the plan itself belongs in exit_plan_mode.
 
@@ -143,7 +143,7 @@
       config:
         id: diffusion-ptc
         name: 扩散模式 (PTC)
-        description: 从极简模式起步，通过“调用目录 → 名称 → 详细命令”按需解锁 SDK 绑定、技能、MCP 与插件，最终完整展开为 PTC 模式。
+        description: 提供可配置初始工具集与调用目录，按会话选择挂载 PTC SDK 绑定、技能、MCP 与插件。
         order: 6
         plugins:
           - id: persona
@@ -192,7 +192,7 @@
                   section: |
                     You are in plan mode. Stay in plan mode until the user approves your plan through exit_plan_mode or switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
 
-                    Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
+                    Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan.
 
                     The tool catalog stays the same across modes for request-cache stability. These plan-mode rules override any later tool description or guidance that suggests using mutation tools; those tools remain listed to keep the tool catalog unchanged. Do not use todo_write to track this planning phase: it tracks implementation after an approved plan, while the plan itself belongs in exit_plan_mode.
 

@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Diffusion Mode Presets",
-    "description": "Starts from a minimal surface (shell + read_image + call_directory) and progressively unlocks tools, skills, MCP servers, and plugins on demand into full Standard or PTC mode."
+    "description": "Configurable initial tools and a session directory for registered tools, skills, MCP servers and plugins, with Native and PTC calling support."
   }
 }

@@ -6,9 +6,9 @@ Diffusion Mode provides a progressive disclosure runtime for DeepSeek Harness (D
 
 ## Precise Mounting
 
-Start with an operation, then select only the exact capabilities needed:
+Directory action examples:
 
-The default initial surface includes `read`, shell, image reading and `call_directory`, plus the PTC transport when applicable. Only registered tools appear; `initialTools` can replace this set. Reuse available tools directly. The directory is the preferred discovery entry for additional capabilities, not a prerequisite for every operation. Choose scoped tools, CLI commands or useful pipelines by task fit and total cost; routing guidance does not impose a path.
+The default initial surface includes `read`, shell, image reading and `call_directory`, plus the PTC transport when applicable. Only registered tools appear; `initialTools` can replace this set. Available tools are directly callable; known names can be mounted directly. Directory actions describe discovery and visibility without prescribing an execution route.
 
 - `call_directory({ query: "<operation>" })`: discover candidates without mounting.
 - `call_directory({ category: "file-search" })`: browse a category without mounting.
@@ -16,24 +16,15 @@ The default initial surface includes `read`, shell, image reading and `call_dire
 - `call_directory({ names: ["skill:<name>"] })`: load the selected skill instructions.
 - Categories and wildcards in `names` explicitly expand whole sets. Use them when the task needs that whole set.
 
-Space-separated query terms are combined with AND; translations are alternatives within each term. For example, `query: "文档 excel"` requires document and spreadsheet evidence instead of returning every generic file tool. ASCII words match word/identifier boundaries. Category filters use actual category IDs, aliases, families or exact suffixes; they do not search tool names. The live overview lists categories and counts; use lookup for candidates.
+Space-separated query terms are combined with AND; translations are capability terms within each term, without adding provider names. For example, `query: "文档 excel"` requires document and spreadsheet evidence instead of returning every generic file tool. ASCII words match word/identifier boundaries. Category filters use actual category IDs, aliases, families or exact suffixes; they do not search tool names. The live overview lists categories and counts; use lookup for candidates.
 
-Exact tool names rank first. When a query is an exact functional category or alias, matching category candidates precede incidental name matches; other matches remain accessible through pagination. Initial tools are searchable under their functional category/source and marked `[Unlocked]`; lookup never mounts tools and ranking never selects them.
+Matching tools and skills use a shared name A–Z order before pagination, independent of relevance, provider and availability. Category overviews use ID order; mount, unload, exported member lists and returned skill names also use A–Z order. Sorting is case-insensitive English collation, with original names breaking case ties; names are never rewritten. Initial tools remain searchable under their functional category/source as `[Unlocked]`. Lookup does not mount tools.
 
 ---
 
-## 🔄 Progressive Disclosure Lifecycle (Search First Recommended)
+## Directory Actions
 
-The progressive expansion lifecycle consists of four lightweight phases:
-
-```
-┌─────────────────────┐     ┌─────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
-│ 1. Search First     │ ──> │ 2. Catalog  │ ──> │ 3. Detail & Unlock  │ ──> │  4. Dynamic Unload  │
-│ (Query & Discovery) │     │  (Overview) │     │ (Mount into Session)│     │  (Prune / Reset)    │
-└─────────────────────┘     └─────────────┘     └─────────────────────┘     └─────────────────────┘
-```
-
-> 💡 **Search First (Recommended)**: Before mounting or calling unfamiliar capabilities, search installed tools and skills via `call_directory({ query: "<keyword>" })`, then select exact names. In PTC, run `await tools.call_directory(...)` inside `run_code`; newly mounted bindings are available in the next `run_code`.
+These actions have separate effects and do not impose a sequence. In PTC, `await tools.call_directory(...)` runs inside `run_code`; newly mounted bindings are available in the next `run_code`.
 
 1. **Search & Lookup (`lookup`)**: `call_directory({ query: "<keyword>" })`  
    Searches specific tools or skills by keyword or category across currently installed harness tools without dumping large parameter schemas into the context.
@@ -91,9 +82,10 @@ Candidate lines show functional categories and source IDs. Legacy full source se
 
 ## 💡 Prompt Engineering & Context Economy
 
-1. **Adaptive Collaboration**: Stay solo for quick or tightly coupled work. Prefer bounded subagents for worthwhile independent tasks; use durable teammates as lead when sustained coordination or shared dependencies justify their cost. Choose fresh tasks or forks by context needs, reuse suitable agents and mount exact tools only. Initial guidance is brief; assignment and result-validation rules expand after collaboration tools are mounted. Assigned members retain their team identity without needing a spawn tool and do not re-delegate by default.
-2. **Domain Skills (`skills`)**: Search registered providers for relevant workflows. Skill dependencies use explicit `skillCompanions` mappings (empty by default). Domain inference requires `inferSkillCompanions: true`; no fixed installation paths are used.
-3. **Context Pruning**: When completing large milestones, call `call_directory({ action: "unload", names: [...] })` to keep the context window lean and focused.
+1. **Collaboration Contracts**: Initial guidance does not advertise locked collaboration tools. Mounted tools expose their context and control contracts; assigned members retain host identity and rules. The preset does not choose whether to delegate or how large a team should be.
+2. **Domain Skills (`skills`)**: Lookup returns registered metadata; loading returns instructions. Skill dependencies use explicit `skillCompanions` mappings (empty by default); domain inference requires `inferSkillCompanions: true`.
+3. **Visibility State**: `unload` removes selected tools and `reset` restores the initial surface. Neither operation erases conversation history or changes host permissions.
+
 
 
 ## Configuration and State
@@ -102,11 +94,11 @@ See [README configuration](README.md) for replaceable initial tools, categories,
 
 - `/runtime` and `/runtime-v2` export the same controller.
 - Each directory request reads the requesting scope directly. A host snapshot is never substituted for an agent inventory, and tools from a sample agent are not merged into other scopes.
-- Functional categories and known plugin/MCP capabilities include operation recipes. Focused single-category lookup/mount results reveal the relevant recipe; broad mixed results and the initial prompt do not expand every workflow.
+- Registered tool and skill descriptions take precedence over preset copy. Categories with registered descriptions use neutral IDs and counts in the overview; lookup/detail presents each callable's own wording without an additional preset route. Categories with no registered descriptions retain preset summaries and focused fallback notes. No provider's description is promoted to represent a whole shared category.
 - Recognized native operation sections follow mounted tools, including grouped job, terminal, session-query and goal guidance. Image defaults follow image generation/editing tools; canvas context follows image/canvas capabilities. Unload, removal and scope changes update these instructions as well as schemas.
 - Shell names such as `bash` and `pwsh` belong to `terminal` with source `core:terminal`; configured plugin operations such as `ops_bash` retain their provider identity. Persistent-terminal instructions appear only when a corresponding session control is mounted, not merely because shell execution is available.
 - The constant guide keeps discovery, exact mounting, mode-specific invocation and scope boundaries brief. Collaboration contracts expand when relevant. Unknown sections and host permission/approval policies are preserved; verbosity and call counts are optimization references, never output truncation or permission bypass mechanisms.
-- Unknown services and custom categories receive generic contract-based guidance. Optional `guidance` metadata and `categoryGuidance` overrides customize it without inventing tools, installing services or changing visibility; `categoryGuidance: false` disables recipes.
+- Unknown services and custom categories without registered descriptions receive generic contract-based fallback notes. Optional `guidance` metadata and `categoryGuidance` overrides customize that fallback without inventing tools, installing services or changing visibility; native descriptions take precedence, and `categoryGuidance: false` disables recipes.
 - Full unlock supports selective exclusions; Native and PTC directory result metadata persists unlock, unload and reset state.
 - Wildcard prefix expansion requires an explicit `*` for both mount and unload.
 - The optional host exporter listens for tool, skill and plugin events. It is disabled by default, resolves the current workspace on refresh, and refuses to overwrite unmanaged files.

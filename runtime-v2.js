@@ -1,5 +1,5 @@
 import {
-  buildCompleteInventory, createCatalogPolicy, firstLineSummary,
+  buildCompleteInventory, createCatalogPolicy, firstLineSummary, compareNames,
   getScopeOf, normalizeTokenList, quickUnlockLines, renderSkillContent, unwrapService,
   inferSkillCompanions, classifyTool, classifyToolSource, getCategoryGuidance, toolsForSource, CATEGORY_META, PERSISTENT_TERMINAL_TOOLS,
 } from './catalog-builder.js';
@@ -323,21 +323,21 @@ export function apply(ctx, config = {}) {
     if (ids.length !== 1) return [];
     const category = inventory.categories.get(ids[0]);
     const guidance = getCategoryGuidance(category, policy);
-    return guidance ? ['', '## Category Workflow', `- \`${category.id}\`: ${guidance}`] : [];
+    return guidance ? ['', '## Category Notes', `- \`${category.id}\`: ${guidance}`] : [];
   }
 
   /** Stage 1: Render the top-level categorized directory + usage reminder footer. */
   function renderCatalogStage(inventory, agentOrScope) {
     const { allToolsMap, skills, categories } = inventory;
     const fullVisible = viewHook.unfilteredView(agentOrScope).visible;
-    const initialList = [...INITIAL_TOOLS].filter(t => t === 'call_directory' || fullVisible.has(t));
+    const initialList = [...INITIAL_TOOLS].filter(t => t === 'call_directory' || fullVisible.has(t)).sort(compareNames);
     const totalTools = [...allToolsMap.values()].filter(t => t.category !== 'initial').length;
     const unlockedCount = [...allToolsMap.values()].filter(t => t.category !== 'initial' && t.unlocked).length;
 
     const lines = [
       `# Diffusion Mode · Call Directory (${isPtcMode ? 'PTC Mode' : 'Standard Mode'})`,
       '',
-      `> 💡 **Search First (Recommended)**: Before mounting or calling unfamiliar capabilities, use \`${directoryCall}({ action: "lookup", query: "<keyword>" })\` to search dynamically installed tools and skills in this harness.`,
+      `Lookup searches currently registered tools and skills without mounting: \`${directoryCall}({ action: "lookup", query: "<keyword>" })\`.`,
       '',
       `- **Currently Available Basic Tools**: ${initialList.map(t => `\`${t}\``).join(', ')}`,
       `- **Total Capabilities in Environment**: **${totalTools}** extended tools (**${unlockedCount}** unlocked) + **${skills.length}** domain skills (Skills)`,
@@ -348,27 +348,15 @@ export function apply(ctx, config = {}) {
       '## Capability Categories',
     ];
 
-    const groups = [
-      { key: 'capability', header: '### 1. Functional Capabilities' },
-      { key: 'skill', header: '### 2. Domain Skills Repository (Skills)' },
-      { key: 'mcp', header: '### 3. Unclassified MCP Sources' },
-      { key: 'plugin', header: '### 4. Unclassified Plugin Sources' },
-    ];
-
-    for (const grp of groups) {
-      const matchingCats = [...categories.values()].filter(c => c.kind === grp.key);
-      if (matchingCats.length === 0) continue;
-      lines.push('', grp.header);
-      for (const cat of matchingCats) {
-        if (cat.kind === 'skill') {
-          lines.push(`- **\`${cat.id}\`** (${cat.skills.length} skills) — ${cat.summary}`);
-        } else {
-          const uCount = cat.tools.filter(t => t.unlocked).length;
-          const statusTag = uCount === cat.tools.length
-            ? `✅ All Unlocked (${cat.tools.length}/${cat.tools.length})`
-            : `🔒 Unlocked ${uCount}/${cat.tools.length}`;
-          lines.push(`- **\`${cat.id}\`** — **${cat.title}** [${statusTag}]: ${cat.summary}`);
-        }
+    for (const cat of [...categories.values()].sort((a, b) => compareNames(a.id, b.id))) {
+      if (cat.kind === 'skill') {
+        lines.push(`- **\`${cat.id}\`** (${cat.skills.length} skills) — ${cat.summary}`);
+      } else {
+        const uCount = cat.tools.filter(t => t.unlocked).length;
+        const statusTag = uCount === cat.tools.length
+          ? `✅ All Unlocked (${cat.tools.length}/${cat.tools.length})`
+          : `🔒 Unlocked ${uCount}/${cat.tools.length}`;
+        lines.push(`- **\`${cat.id}\`**${cat.title === cat.id ? '' : ` — **${cat.title}**`} [${statusTag}]: ${cat.summary}`);
       }
     }
 
@@ -391,17 +379,17 @@ const QUERY_SYNONYMS = {
   'word': ['doc', 'docx', 'document'],
 
   // Browsing & Web
-  '浏览器': ['browser', 'web', 'navigate', 'chrome', 'tab'],
+  '浏览器': ['browser', 'web', 'navigate', 'tab'],
   '网页': ['web', 'browser', 'fetch', 'url', 'page'],
-  'browser': ['web', 'tab', 'navigate', 'chrome', 'snapshot'],
-  '爬虫': ['crawl', 'extract', 'scrape', 'tavily', 'spider'],
-  '搜索': ['search', 'find', 'query', 'tavily', 'web'],
+  'browser': ['web', 'tab', 'navigate', 'snapshot'],
+  '爬虫': ['crawl', 'extract', 'scrape', 'spider'],
+  '搜索': ['search', 'find', 'query', 'web'],
 
   // Vision & Design
   '图片': ['image', 'canvas', 'draw', 'paint', 'picture', 'photo'],
   '生图': ['image', 'generate_image', 'canvas', 'draw'],
   '画布': ['canvas', 'image', 'draw'],
-  '设计': ['design', 'ui', 'prototype', 'opendesign'],
+  '设计': ['design', 'ui', 'prototype'],
 
   // Dev, Terminal & Git
   '代码': ['code', 'file', 'git', 'grep', 'glob', 'read', 'write'],
@@ -410,11 +398,11 @@ const QUERY_SYNONYMS = {
   'git': ['worktree', 'branch', 'repo'],
 
   // Memory & Knowledge
-  '记忆': ['memory', 'viking', 'hindsight', 'session', 'recall'],
-  'memory': ['viking', 'hindsight', 'recall', 'store'],
+  '记忆': ['memory', 'session', 'recall'],
+  'memory': ['recall', 'store'],
 
   // Market & Plugins
-  '市场': ['market', 'plugin', 'dshmarket', 'extension'],
+  '市场': ['market', 'plugin', 'extension'],
   '插件': ['plugin', 'market', 'extension', 'manager'],
 
   // Remote & SSH
@@ -422,9 +410,9 @@ const QUERY_SYNONYMS = {
   'ssh': ['remote', 'server', 'tunnel'],
 
   // Reverse engineering & Security
-  '逆向': ['rea', 'reverse', 'binary', 'disasm'],
+  '逆向': ['reverse', 'binary', 'disasm'],
   '安全': ['safety', 'audit', 'guard', 'sandbox', 'acl'],
-  '桌面': ['computer_use', 'wincu', 'desktop', 'mouse'],
+  '桌面': ['computer_use', 'desktop', 'mouse'],
 };
 
   /** Stage 2: Lookup specific names and descriptions by category and/or keyword query. */
@@ -453,7 +441,6 @@ const QUERY_SYNONYMS = {
       return hay => pattern.test(hay);
     };
     const terms = rawTokens.map(token => ({
-      original: matcher(token),
       alternatives: [token, ...(Object.hasOwn(QUERY_SYNONYMS, token) ? QUERY_SYNONYMS[token] : [])].map(matcher),
     }));
     const searchText = text => `${text} ${text.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z])([A-Z][a-z])/g, '$1 $2')}`.toLowerCase();
@@ -496,25 +483,10 @@ const QUERY_SYNONYMS = {
       }
     }
 
-    const rank = item => {
-      const nLower = item.name.toLowerCase();
-      if (nLower === rawQuery) return 0;
-      // Exact functional intent precedes incidental words in provider tool names.
-      if (queryCategory && (item.category === queryCategory || item.source === queryCategory)) return 1;
-      if (rawQuery && nLower.startsWith(rawQuery)) return 2;
-      if (!terms.length) return 7;
-      const nameText = searchText(item.name);
-      if (terms.every(term => term.original(nameText))) return 3;
-      const catLower = (item.category || '').toLowerCase();
-      if (terms.every(term => term.original(searchText(`${item.name} ${catLower} ${item.description}`)))) return 4;
-      if (matchesQuery(nameText)) return 5;
-      if (matchesQuery(`${nameText} ${catLower}`)) return 6;
-      return 7;
-    };
     const matches = [
       ...matchedTools.map(item => ({ ...item, kind: 'tool' })),
       ...matchedSkills.map(item => ({ ...item, kind: 'skill' })),
-    ].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name) || a.kind.localeCompare(b.kind));
+    ].sort((a, b) => compareNames(a.name, b.name) || compareNames(a.kind, b.kind));
     const page = matches.slice(offset, offset + limit);
 
     const lines = [
@@ -545,7 +517,7 @@ const QUERY_SYNONYMS = {
       lines.push(`- Showing ${offset + 1}-${offset + page.length} of ${matches.length} matches.`, '', '## Candidates');
       for (const item of page) {
         const badge = item.kind === 'skill' ? '[Skill]' : item.unlocked ? '[Unlocked]' : '[Locked]';
-        lines.push(`- \`${item.name}\` ${badge} (${item.category ?? 'skills'}${item.source ? '; source: ' + item.source : ''}): ${firstLineSummary(item.description, 120)}`);
+        lines.push(`- \`${item.name}\` ${badge} (${item.category ?? 'skills'}${item.source ? '; source: ' + item.source : ''}): ${firstLineSummary(item.description || '(no registered description)', 120)}`);
       }
 
       if (offset + page.length < matches.length) {
@@ -556,10 +528,10 @@ const QUERY_SYNONYMS = {
 
     lines.push(
       '',
-      '## Next Step: Select by Task Fit',
-      '- Compare descriptions (Ranking is not a selection). If a matching tool is already **[Unlocked]**, reuse it directly.',
+      '## Availability & Invocation',
+      '- Candidates are ordered by name A–Z, not relevance or provider. **[Unlocked]** tools are already available for direct calls.',
       `- To mount a **[Locked]** tool: \`${directoryCall}({ action: "detail", names: ["<exact-name>"] })\`. For a **[Skill]**, prefix with \`skill:\` to load its guidance.`,
-      '- Mount only what you need for the immediate next operation. Mounting makes capabilities available; invoke them separately in the next step.'
+      '- Exact names select individual capabilities; categories and wildcards select sets. Mounting changes availability; target operations are separate calls.'
     );
 
     return lines.join('\n');
@@ -750,7 +722,7 @@ const QUERY_SYNONYMS = {
       const newlyMounted = [...finalTools].filter(name => !allToolsMap.get(name)?.unlocked).length;
       lines.push(
         '',
-        `✅ **Available (${finalTools.size} tools; ${newlyMounted} newly mounted, ${finalTools.size - newlyMounted} already available)**: ${[...finalTools].map(t => `\`${t}\``).join(', ')}`,
+        `✅ **Available (${finalTools.size} tools; ${newlyMounted} newly mounted, ${finalTools.size - newlyMounted} already available)**: ${[...finalTools].sort(compareNames).map(t => `\`${t}\``).join(', ')}`,
         isPtcMode
           ? '> Calling syntax (PTC Mode): Call via `await tools.<name>(args)` in subsequent `run_code` execution.'
           : '> Calling syntax (Standard Mode): Native schemas are now mounted in the session; call them directly as native function calls in subsequent turns.'
@@ -758,17 +730,17 @@ const QUERY_SYNONYMS = {
     }
 
     if (failedSkills.length > 0) {
-      lines.push('', `⚠️ **Skills could not be loaded**: ${failedSkills.map(name => `\`${name}\``).join(', ')}. Check the skill provider.`);
+      lines.push('', `⚠️ **Skills could not be loaded**: ${failedSkills.sort(compareNames).map(name => `\`${name}\``).join(', ')}. Check the skill provider.`);
     }
 
     if (unmatched.length > 0) {
       lines.push(
         '',
-        `⚠️ **The following names were not found**: ${unmatched.map(u => `\`${u}\``).join(', ')}. 💡 **Recommendation**: Before calling, search currently installed capabilities via \`${directoryCall}({ action: "lookup", query: "<keyword>" })\`.`
+        `⚠️ **The following names were not found**: ${unmatched.sort(compareNames).map(u => `\`${u}\``).join(', ')}. Lookup searches currently installed capabilities via \`${directoryCall}({ action: "lookup", query: "<keyword>" })\`.`
       );
     }
 
-    const detailedList = [...finalTools].map(tName => allToolsMap.get(tName)).filter(Boolean);
+    const detailedList = [...finalTools].map(tName => allToolsMap.get(tName)).filter(Boolean).sort((a, b) => compareNames(a.name, b.name));
     lines.push(...categoryWorkflowLines(inventory, detailedList.map(tool => tool.category)));
     if (detailedList.length > 0) {
       if (detailedList.length === 1) {
@@ -795,31 +767,31 @@ const QUERY_SYNONYMS = {
           const callSyntax = isPtcMode
             ? (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(tool.name) ? `await tools.${tool.name}` : `await tools[${JSON.stringify(tool.name)}]`)
             : `${tool.name}`;
-          lines.push(`- \`${tool.name}\` (\`${callSyntax}\`): ${firstLineSummary(tool.description, 100)}`);
+          lines.push(`- \`${tool.name}\` (\`${callSyntax}\`): ${firstLineSummary(tool.description || '(no registered description)', 100)}`);
         }
         lines.push(
           '',
-          `> 💡 Note: The tools above are now mounted into the ${isPtcMode ? 'PTC SDK' : 'session toolbar'}. Their schemas are active and ready to be invoked in the next step.`
+          `Note: The tools above are now mounted into the ${isPtcMode ? 'PTC SDK' : 'session toolbar'}. Their schemas are active and ready to be invoked in the next step.`
         );
       }
     }
 
     if (loadedSkills.length > 0) {
       lines.push('', `## Loaded Skill Instructions (${loadedSkills.length} skills)`);
-      for (const skill of loadedSkills) {
+      for (const skill of [...loadedSkills].sort((a, b) => compareNames(a.name, b.name))) {
         lines.push('', renderSkillContent(skill));
       }
     }
 
     return {
       text: lines.join('\n'),
-      unlocked: unlockedRecord,
-      loadedSkills: loadedSkills.map(s => s.name),
+      unlocked: unlockedRecord.sort(compareNames),
+      loadedSkills: loadedSkills.map(s => s.name).sort(compareNames),
     };
   }
 
   function ambiguousCategoryMessage(token, categories) {
-    return `⚠️ Ambiguous category suffix \`${token}\`: ${categories.map(cat => `\`${cat.id}\``).join(', ')}. Supply a full category ID; no tools changed for this token.`;
+    return `⚠️ Ambiguous category suffix \`${token}\`: ${categories.map(cat => cat.id).sort(compareNames).map(id => `\`${id}\``).join(', ')}. Supply a full category ID; no tools changed for this token.`;
   }
 
   /** Stage 4: Unload specific tools or reset the session back to minimal mode to prune context. */
@@ -911,16 +883,16 @@ const QUERY_SYNONYMS = {
       isReset
         ? '🔄 **Current session has been reset to the minimal initial state** (only basic tools retained).'
         : unloadedRecord.length > 0
-          ? `🔻 **Successfully unloaded tools (${unloadedRecord.length})**: ${unloadedRecord.map(t => `\`${t}\``).join(', ')}`
+          ? `🔻 **Successfully unloaded tools (${unloadedRecord.length})**: ${unloadedRecord.sort(compareNames).map(t => `\`${t}\``).join(', ')}`
           : '⚠️ **No matching tools found to unload** (they may not have been unlocked or names did not match).',
       '',
-      `> 💡 Note: Unloaded tools can be re-mounted at any time via \`${directoryCall}({ action: "detail", names: [...] })\`.`,
+      `Note: Unloaded tools can be re-mounted at any time via \`${directoryCall}({ action: "detail", names: [...] })\`.`,
     ];
 
     return {
       stage: isReset ? 'reset' : 'unload',
       unlocked: [],
-      unloaded: isReset ? ['*'] : unloadedRecord,
+      unloaded: isReset ? ['*'] : unloadedRecord.sort(compareNames),
       loadedSkills: [],
       report: lines.join('\n'),
     };
@@ -930,7 +902,7 @@ const QUERY_SYNONYMS = {
   ctx.tools.register({
     name: 'call_directory',
     description:
-      'Discover additional tools, content sources and skills when useful; available tools can be called directly. Use "lookup" for candidates and category workflows, "detail" with exact names to mount tools or load skill guidance, then call the target separately. Choose tools or shell by task fit. Prefer explicit actions.',
+      'Directory of currently registered tools, content sources and skills. "catalog" and "lookup" return metadata without mounting; "detail" mounts selected tools or loads skill instructions. Target operations are separate calls; available tools are directly callable. Lookup candidates and returned name lists use A–Z order. Preset category notes appear only when registered descriptions are absent.',
     parameters: {
       type: 'object',
       additionalProperties: false,
@@ -939,17 +911,17 @@ const QUERY_SYNONYMS = {
           type: 'string',
           enum: ['catalog', 'lookup', 'detail', 'unload', 'reset'],
           description:
-            'Choose catalog (read-only overview), lookup (read-only candidates), detail (mount tools/load skill guidance), unload (prune tools) or reset (restore initial tools, keeping history). An explicit action takes priority. If omitted, non-empty names selects detail; otherwise query/category selects lookup; otherwise catalog.',
+            'Actions: catalog (read-only overview), lookup (read-only candidates), detail (mount tools/load skill guidance), unload (prune tools) or reset (restore initial tools, keeping history). An explicit action takes priority. If omitted, non-empty names selects detail; otherwise query/category selects lookup; otherwise catalog.',
         },
         category: {
           type: 'string',
           description:
-            'Lookup filter: registered category ID, alias, family or full suffix, e.g. "file", "design", "web-search" or source "mcp:tavily"/"mcp". With detail/unload, selects a whole category only without non-empty names.',
+            'Category/source selector from the current directory. For lookup, filters candidates without mounting. For detail/unload with empty names, selects the matching set; non-empty names take precedence. Registered aliases, source families and unique suffixes are accepted.',
         },
         query: {
           type: 'string',
           description:
-            'Lookup one operation, e.g. "read file". Every space-separated term must match the same candidate, with synonym support; search independent operations separately. Searches names, categories and descriptions without mounting capabilities.',
+            'Query for an operation, e.g. "read file". Every space-separated term must match the same candidate, with synonym support; independent operations can have separate queries. Searches names, categories and descriptions without mounting capabilities.',
         },
         offset: {
           type: 'integer',
@@ -961,7 +933,7 @@ const QUERY_SYNONYMS = {
         },
         names: {
           description:
-            'Prefer exact names needed next, e.g. ["read"] or ["skill:<registered name>"]. For detail/unload, non-empty names override category; lookup/catalog ignore names. Aliases/categories/wildcards select whole sets; suffixes must be unique. Business arguments belong to the target call.',
+            'Exact names select individual tools or skills, e.g. ["read"] or ["skill:<registered name>"]. For detail/unload, non-empty names override category; lookup/catalog ignore names. Aliases/categories/wildcards select whole sets; suffixes must be unique. Business arguments belong to the target call.',
           oneOf: [
             { type: 'array', items: { type: 'string' } },
             { type: 'string' },
@@ -1055,38 +1027,21 @@ const QUERY_SYNONYMS = {
     if (agent && !controller.ownsAgent(agent)) return [];
     const available = viewHook.unfilteredView(agent).visible;
     const membership = teamMembership(agent);
-    const participant = membership && membership.role !== 'lead';
-    const assigned = participant || Math.max(agent?.session?.header?.delegationDepth ?? 0, agent?.options?.subagentDepth ?? 0) > 0;
-    const isVisible = name => Boolean(agent && controller.isToolVisible(agent, name));
-    const launchers = ['subagent', 'subagent_fork'].filter(name => available.has(name));
-    const canStartTeam = !assigned && available.has('spawn_teammate') && (!membership || membership.role === 'lead');
-    const coordinating = teamContextTools.some(name => available.has(name) && isVisible(name));
-    if (!launchers.length && !canStartTeam && !assigned && !coordinating) return [];
-    const active = assigned || coordinating || launchers.some(isVisible);
-    if (!active) return [
-      '', '## Adaptive Collaboration',
-      'Stay solo for small, serial or tightly coupled work; delegate when worthwhile.',
-      ...(launchers.length ? [`Choose ${launchers.map(name => name === 'subagent' ? '`subagent` for fresh context' : '`subagent_fork` for completed conversation history').join(' or ')}.`] : []),
-      ...(canStartTeam ? ['Durable team: `spawn_teammate` for sustained parallel roles; reuse members.'] : []),
+    const assigned = (membership && membership.role !== 'lead') ||
+      Math.max(agent?.session?.header?.delegationDepth ?? 0, agent?.options?.subagentDepth ?? 0) > 0;
+    const mounted = name => Boolean(agent && available.has(name) && controller.isToolVisible(agent, name));
+    const launchers = ['subagent', 'subagent_fork'].filter(mounted);
+    const coordinating = teamContextTools.some(mounted);
+    if (!assigned && !launchers.length && !coordinating) return [];
+    return [
+      '', '## Collaboration Contracts',
+      ...(assigned ? ['Assigned member: the current assignment, user/workspace rules and host permissions define scope and delegation authority.'] : []),
+      ...(launchers.includes('subagent') ? ['`subagent` starts with a fresh task context.'] : []),
+      ...(launchers.includes('subagent_fork') ? ['`subagent_fork` inherits completed conversation history; current-turn inputs follow its registered contract.'] : []),
+      ...(mounted('spawn_teammate') ? ['`spawn_teammate` creates a durable teammate under the host membership contract.'] : []),
+      'Team-only roster/wait tools do not track independent subagents. Each control applies only to agents covered by its registered scope.',
+      'Assignment and result contracts retain read-only/approval constraints. An inactive agent status alone does not establish a verified result.',
     ];
-    const lines = [
-      '',
-      '## Adaptive Collaboration',
-      '- **Choose by benefit**: Follow user/workspace rules and permissions. Stay solo for quick, serial or tightly coupled work. Delegate independent work when saved time, context or independent verification outweighs startup and coordination cost.',
-    ];
-    if (assigned) lines.push('- **Assigned member**: Complete your bounded assignment and report evidence to the requesting agent. Do not create teammates or re-delegate by default; subdivide only when explicitly allowed and useful.');
-    if (launchers.length) {
-      const choices = [];
-      if (available.has('subagent')) choices.push('`subagent` for a self-contained brief in a fresh context');
-      if (available.has('subagent_fork')) choices.push(available.has('subagent') ? '`subagent_fork` when completed conversation history is needed' : '`subagent_fork` as the available launcher, with a complete brief for this task');
-      lines.push(`- **Bounded delegation**: Choose ${choices.join('; or ')}. Mount only the chosen launcher with \`${directoryCall}({ action: "detail", names: ["<chosen exact name>"] })\`. Dispatch once scope and inputs are sufficient; do not pre-solve the delegated task. Follow its reporting contract: Team-only roster/wait tools do not track independent subagents.`);
-    }
-    if (canStartTeam) lines.push('- **Durable team**: As lead, choose `spawn_teammate` for sustained parallel responsibilities needing repeated coordination or shared task dependencies. Reuse suitable agents, start the smallest useful team, and mount waiting/task-board tools only as needed.');
-    if (assigned || coordinating || launchers.some(isVisible)) lines.push(
-      '- **Assignment contract**: State goal, scope, inputs, deliverable and acceptance evidence, including current-turn requirements a fork cannot inherit. Preserve read-only/approval constraints; give writers disjoint ownership or serialize overlapping edits. Avoid duplicate work and recursive spawning without a distinct benefit.',
-      '- **Close the loop**: Advance independent parent work while agents run. Use completion notifications; wait only when blocked, without polling. Inactive is not a verified result: treat reports as claims, verify evidence and integrate outputs. Use only controls whose registered scope covers that agent; prune tools after no active work needs them.',
-    );
-    return lines;
   }
 
   // Register Diffusion Mode prompt section
@@ -1097,14 +1052,12 @@ const QUERY_SYNONYMS = {
     text: context =>
       [
         `# Diffusion Mode · ${isPtcMode ? 'PTC' : 'Native'}`,
-        `**Need more tools or content sources? Prefer ${directoryCall} to discover them.** Reuse available tools directly; no lookup is needed for a known, available operation.`,
-        'Choose by task fit and total cost: dedicated tools suit scoped reads/edits/search; shell suits Git/build/test and useful pipelines; locked is not missing. Keep scope, permissions and data granularity; report limits, never guess private stores.',
-        `Search First (Recommended): unknown operation → ${directoryCall}({query:"..."}) (terms AND); select by fit → ${directoryCall}({names:["exact"]}). Browse a category once for related work. Category lookup only browses; categories/wildcards in names mount whole sets. skill:<name> loads guidance.`,
+        `call_directory exposes currently registered tools, content sources and skills. Available tools are directly callable; lookup is not a prerequisite.`,
+        `${directoryCall}({action:"catalog"}) returns categories; ${directoryCall}({action:"lookup",query:"..."}) searches candidates (terms AND); ${directoryCall}({action:"detail",names:["exact"]}) mounts tools or loads skill:<name> instructions. Category lookup only browses; categories/wildcards in names mount whole sets.`,
         isPtcMode
-          ? 'Inside run_code, use await tools.<name>(args); newly mounted bindings appear in the next run_code. Prefer SDK tools for scoped I/O; use JS for computation and batching.'
-          : 'Call mounted native tools directly; directory examples are not shell commands.',
-        'Follow schemas/workflows; omit unused fields. Batch independent work safely, preserve dependencies, read relevant ranges and verify results. Report key findings; save lengthy output to files when useful.',
-        'Unload obsolete sets when worth a call; reset only when no active work needs them.',
+          ? 'Inside run_code, await tools.<name>(args) invokes a mounted binding; newly mounted bindings appear in the next run_code.'
+          : 'Mounted native tools are separate calls with their registered JSON arguments; directory examples are not shell commands.',
+        'unload removes selected tools; reset restores the initial surface. Neither erases conversation history. Mounting changes visibility, not scope, permissions or approval requirements.',
         ...collaborationGuidance(context?.scope),
       ].join('\n'),
   });
@@ -1201,7 +1154,7 @@ const QUERY_SYNONYMS = {
       }
 
       const family = classifyTool(toolName, policy);
-      const msg = `Diffusion Mode Guard: Tool "${toolName}" is installed in this harness (${family}) but is currently locked to preserve context budget.\n💡 Recommendation: Search capabilities with \`${directoryCall}({ action: "lookup", query: "${toolName}" })\`, or mount directly with \`${directoryCall}({ action: "detail", names: [${JSON.stringify(toolName)}] })\`.`;
+      const msg = `Diffusion Mode Guard: Tool "${toolName}" is installed in this harness (${family}) but is not mounted in this session.\nDirectory actions: lookup metadata with \`${directoryCall}({ action: "lookup", query: "${toolName}" })\`, or mount directly with \`${directoryCall}({ action: "detail", names: [${JSON.stringify(toolName)}] })\`.`;
       return {
         kind: 'deny',
         reason: msg,
@@ -1223,7 +1176,7 @@ const QUERY_SYNONYMS = {
       !controller.isToolVisible(agent, toolName) &&
       viewHook.unfilteredView(agent).visible.has(toolName)
     ) {
-      const msg = `Error: Tool "${toolName}" exists in this harness but is currently locked in Diffusion Mode. Recommendation: Search installed capabilities first via \`${directoryCall}({ action: "lookup", query: "${toolName}" })\` or call \`${directoryCall}({ action: "detail", names: [${JSON.stringify(toolName)}] })\` to unlock it.`;
+      const msg = `Error: Tool "${toolName}" exists in this harness but is currently locked in Diffusion Mode. Directory actions: lookup metadata via \`${directoryCall}({ action: "lookup", query: "${toolName}" })\` or call \`${directoryCall}({ action: "detail", names: [${JSON.stringify(toolName)}] })\` to unlock it.`;
       return {
         kind: 'block',
         feedback: [{ type: 'text', text: msg }],

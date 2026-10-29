@@ -1,6 +1,6 @@
 {
   "name": "dsh-diffusion-preset",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "description": "扩散模式 (Diffusion Mode) Agent 预设与渐进式调用目录，保持极简初始上下文并按需解锁工具与技能。",
   "keywords": [
