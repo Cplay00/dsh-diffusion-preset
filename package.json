@@ -2,7 +2,7 @@
   "name": "dsh-diffusion-preset",
   "version": "1.2.1",
   "type": "module",
-  "description": "扩散模式 (Diffusion Mode) Agent 预设与渐进式调用目录，保持极简初始上下文并按需解锁工具与技能。",
+  "description": "提供可配置的轻量初始工具集与 call_directory 调用目录，按需发现和挂载工具、技能、MCP 与插件能力，支持 Native 和 PTC。减少无关工具定义对上下文的占用与干扰，有助于模型聚焦当前任务；可卸载工具以控制后续上下文规模。",
   "keywords": [
     "dsh",
     "deepseek-harness",

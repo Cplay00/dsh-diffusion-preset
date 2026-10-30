@@ -6,7 +6,7 @@
       config:
         id: diffusion
         name: 扩散模式
-        description: 提供可配置初始工具集与调用目录，按会话选择挂载工具、技能、MCP 与插件。
+        description: 以可配置的轻量初始工具集与 call_directory 起步，按需挂载工具、技能、MCP 与插件能力；减少无关工具定义的上下文占用，有助于模型聚焦当前任务。支持 Native 调用与工具卸载。
         order: 5
         plugins:
           - id: persona
@@ -143,7 +143,7 @@
       config:
         id: diffusion-ptc
         name: 扩散模式 (PTC)
-        description: 提供可配置初始工具集与调用目录，按会话选择挂载 PTC SDK 绑定、技能、MCP 与插件。
+        description: 以可配置的轻量初始工具集与 call_directory 起步，按需挂载 PTC SDK 绑定、技能、MCP 与插件能力；减少无关工具定义的上下文占用，有助于模型聚焦当前任务。支持 PTC 调用与工具卸载。
         order: 6
         plugins:
           - id: persona

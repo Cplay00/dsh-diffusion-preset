@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Diffusion Mode Presets",
-    "description": "Configurable initial tools and a session directory for registered tools, skills, MCP servers and plugins, with Native and PTC calling support."
+    "description": "Start with a configurable lightweight tool set and the call_directory directory. Discover and load tools, skills, MCP and plugin capabilities on demand, with Native and PTC support. Fewer irrelevant tool definitions leave more context for the task and can help the model stay focused; unload tools to reduce subsequent context overhead."
   }
 }
