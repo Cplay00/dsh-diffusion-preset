@@ -2,6 +2,7 @@
 export const INITIAL_TOOLS = new Set([
   'call_directory',
   'read',
+  'write',
   'bash',
   'pwsh',
   'ops_bash',

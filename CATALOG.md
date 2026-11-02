@@ -8,7 +8,7 @@ Diffusion Mode provides a progressive disclosure runtime for DeepSeek Harness (D
 
 Directory action examples:
 
-The default initial surface includes `read`, shell, image reading and `call_directory`, plus the PTC transport when applicable. Only registered tools appear; `initialTools` can replace this set. Available tools are directly callable; known names can be mounted directly. Directory actions describe discovery and visibility without prescribing an execution route.
+The default initial surface includes `read`, `write`, shell, image reading and `call_directory`, plus the PTC transport when applicable. Only registered tools appear; `initialTools` can replace this set. Available tools are directly callable; known names can be mounted directly. Directory actions describe discovery and visibility without prescribing an execution route.
 
 - `call_directory({ query: "<operation>" })`: discover candidates without mounting.
 - `call_directory({ category: "file-search" })`: browse a category without mounting.

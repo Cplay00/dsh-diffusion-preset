@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://github.com/Cplay00/dsh-diffusion-preset/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-orange.svg" alt="dsh-plugin"></a>
-  <a href="https://github.com/Cplay00/dsh-diffusion-preset"><img src="https://img.shields.io/badge/version-1.2.1-emerald.svg" alt="Version"></a>
+  <a href="https://github.com/Cplay00/dsh-diffusion-preset"><img src="https://img.shields.io/badge/version-1.2.1.1-emerald.svg" alt="Version"></a>
 </p>
 
 [English](#english) | [中文说明](#中文说明)
@@ -26,7 +26,7 @@
 3. **极简模式与全量模式难以两全**：纯极简模式无法胜任复杂任务，而标准模式又过于臃肿。
 
 **扩散模式通过「调用目录 → 渐进展开 → 动态收敛」解决了这一困境：**
-- **初始极简**：默认开放文本读取 `read`、基础 Shell（Bash/PowerShell）、图片查看器及 `call_directory`；仅实际注册的工具可见，PTC 另保留执行传输工具。简单阅读直接开始，写入、编辑、搜索等能力按需展开；
+- **初始极简**：默认开放文本读取 `read`、文件写入 `write`、基础 Shell（Bash/PowerShell）、图片查看器及 `call_directory`；仅实际注册的工具可见，PTC 另保留执行传输工具。简单读写直接开始，编辑、搜索等能力按需展开；
 - **自适应动态发现**：根据当前 Harness 宿主内实际安装注册的所有可调用内容（内置核心工具、MCP 外部服务、已安装社区插件与领域技能）自适应聚类，无需外部硬编码；
 - **能力发现**：`call_directory` 返回当前注册的工具、技能和分类；已可用工具可直接调用，已知名称可直接挂载，检索不作为前置要求；
 - **精确挂载**：默认按工具的精确名称挂载，不自动带出兄弟工具、团队工具或整个插件。技能加载默认只提供说明；伴生依赖与领域推断均可显式配置；
@@ -313,7 +313,7 @@ PTC 的目录、翻页、挂载、卸载与守卫示例均使用 `await tools.ca
 
 ```yaml
 mode: native
-initialTools: [read, bash, pwsh, read_image]
+initialTools: [read, write, bash, pwsh, read_image]
 companionGroups: []
 skillCompanions:
   my-report-skill: [read, write]
@@ -358,7 +358,7 @@ catalogPath: Diffusion Mode Call Directory.md
 
 Traditional AI agent workflows inject full schemas for dozens of tools and voluminous system instructions upfront. This wastes token budget and disperses model attention on simple tasks.
 
-**Diffusion Mode** starts from a lightweight baseline (text reader `read`, shell, image reader, and `call_directory`; PTC also retains its transport). Available tools are directly callable, known names can be mounted directly, and the directory exposes discovery and visibility actions without prescribing a tool, provider or sequence. Matching tools and skills share name A–Z order before pagination, without relevance or provider boosts. Category overviews use category ID order; mount, unload and returned skill lists also use name order. Initial tools remain searchable as `[Unlocked]` and need no mounting. The initial set is configurable and only registered tools appear.
+**Diffusion Mode** starts from a lightweight baseline (text reader `read`, file writer `write`, shell, image reader, and `call_directory`; PTC also retains its transport). Available tools are directly callable, known names can be mounted directly, and the directory exposes discovery and visibility actions without prescribing a tool, provider or sequence. Matching tools and skills share name A–Z order before pagination, without relevance or provider boosts. Category overviews use category ID order; mount, unload and returned skill lists also use name order. Initial tools remain searchable as `[Unlocked]` and need no mounting. The initial set is configurable and only registered tools appear.
 
 ### 🌟 Key Highlights
 
