@@ -7,10 +7,10 @@
 <p align="center">
   <a href="https://github.com/Cplay00/dsh-diffusion-preset/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-orange.svg" alt="dsh-plugin"></a>
-  <a href="https://github.com/Cplay00/dsh-diffusion-preset"><img src="https://img.shields.io/badge/version-1.2.2-emerald.svg" alt="Version"></a>
+  <a href="https://github.com/Cplay00/dsh-diffusion-preset"><img src="https://img.shields.io/badge/version-1.2.3-emerald.svg" alt="Version"></a>
 </p>
 
-[English](#english) | [中文说明](#中文说明)
+[English](#english) | [中文说明](#中文说明) | [更新日志](CHANGELOG.md)
 
 ---
 
@@ -278,9 +278,13 @@ PTC 的目录、翻页、挂载、卸载与守卫示例均使用 `await tools.ca
 
 #### 协作能力与契约
 
-预设不决定是否委派、团队规模或协作方式，也不在初始提示词中主动推广未挂载的协作工具。相关工具挂载后，才补充其上下文和控制范围：`subagent` 使用独立任务上下文，`subagent_fork` 继承已完成的会话历史，`spawn_teammate` 创建持久团队成员。当前轮输入遵循启动工具的实际契约。
+预设只负责能力发现与调用说明，不建议何时委派、是否并行、选择独立子智能体还是团队，也不规定团队规模。初始提示将当前作用域实际注册的工具按分类 ID 统一列出并按 A–Z 排序，不单独突出协作能力；完整参数仍按需挂载。已知名称可直接挂载，多词检索无匹配不代表工具不存在。
+
+相关工具挂载后，补充其上下文和控制范围：`subagent` 使用独立任务上下文，`subagent_fork` 继承已完成的会话历史，`spawn_teammate` 创建持久团队成员。当前轮输入遵循启动工具的实际契约。`team` 分类检索也可发现已注册的共享控制工具 `list_agents`、`send_message`、`interrupt_agent`，保留它们原有的分类、来源和原生说明；按名称只挂载所选工具，显式整类挂载仍按分类自身的工具集合执行。
 
 已分配成员保留必要的身份和宿主规则。工具控制范围以注册契约为准，Team 专用控制不代表独立子智能体控制；`inactive` 状态本身不证明已得到有效结果。用户／工作区规则、只读要求及审批边界持续有效。
+
+Windows 宿主安装并注册 `win_bash` 后，它也属于默认初始 Shell 工具。该工具归入 `terminal`；是否可在当前权限模式执行，以工具自身契约为准。PowerShell 可继续处理 Windows 原生命令和受限模式下的任务。
 
 `guide: false` 可关闭运行时说明；目录尾部说明由 `usageReminder` 独立控制。用户自定义提示词和工具原生说明保留原文，预设不通过过滤它们实现中性化。
 

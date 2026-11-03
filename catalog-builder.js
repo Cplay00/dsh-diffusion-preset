@@ -4,6 +4,7 @@ export const INITIAL_TOOLS = new Set([
   'read',
   'write',
   'bash',
+  'win_bash',
   'pwsh',
   'ops_bash',
   'persistent_bash',
@@ -51,6 +52,7 @@ export const CATEGORY_META = {
     title: 'Agent Teams',
     summary: 'Start durable teammates, wait for Team changes, and manage shared team tasks.',
     guidance: 'Team operations create teammates and manage shared tasks or coordination events. Membership, ownership and control scope follow the host contracts.',
+    relatedTools: ['list_agents', 'send_message', 'interrupt_agent'],
     tools: new Set([
       'spawn_teammate', 'wait_agent', 'team_task_create', 'team_task_get', 'team_task_list', 'team_task_update',
     ]),
@@ -123,7 +125,7 @@ export const CATEGORY_META = {
     title: 'Shell & Terminals',
     summary: 'Execute shell commands and manage persistent terminal sessions.',
     guidance: 'Shell execution and persistent terminal sessions have separate contracts. Session controls address a specific terminal handle and its state.',
-    tools: new Set(['bash', 'pwsh', 'persistent_bash', 'persistent_pwsh', ...PERSISTENT_TERMINAL_TOOLS]),
+    tools: new Set(['bash', 'win_bash', 'pwsh', 'persistent_bash', 'persistent_pwsh', ...PERSISTENT_TERMINAL_TOOLS]),
   },
   'session': {
     source: 'core:session',

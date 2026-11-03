@@ -82,7 +82,7 @@ Candidate lines show functional categories and source IDs. Legacy full source se
 
 ## 💡 Prompt Engineering & Context Economy
 
-1. **Collaboration Contracts**: Initial guidance does not advertise locked collaboration tools. Mounted tools expose their context and control contracts; assigned members retain host identity and rules. The preset does not choose whether to delegate or how large a team should be.
+1. **Neutral Discovery & Collaboration Contracts**: Initial guidance lists all registered tool category IDs in the requesting scope in A–Z order, without highlighting collaboration or mounting schemas. The preset supplies no delegation, parallelism or team-size policy. Known exact names can be mounted directly, and zero keyword matches do not establish absence. Team lookup also returns registered shared control candidates while preserving their category, source and native descriptions; explicit category mounts retain their own tool sets. Mounted tools expose their contracts, and assigned members retain host identity and rules.
 2. **Domain Skills (`skills`)**: Lookup returns registered metadata; loading returns instructions. Skill dependencies use explicit `skillCompanions` mappings (empty by default); domain inference requires `inferSkillCompanions: true`.
 3. **Visibility State**: `unload` removes selected tools and `reset` restores the initial surface. Neither operation erases conversation history or changes host permissions.
 

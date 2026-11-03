@@ -458,6 +458,7 @@ const QUERY_SYNONYMS = {
         : registered;
       const catMatch =
         includeAllCats ||
+        policy.categories[rawCat]?.relatedTools?.includes(tool.name) ||
         (rawCat === 'initial' && registered.category === 'initial') ||
         tool.source?.toLowerCase() === rawCat ||
         tool.source?.toLowerCase().split(':')[0] === rawCat ||
@@ -467,7 +468,7 @@ const QUERY_SYNONYMS = {
       if (!catMatch) continue;
       if (rawTokens.length > 0) {
         const hay = searchText(`${tool.name} ${tool.category} ${tool.source ?? ''} ${tool.description}`);
-        if (!matchesQuery(hay) && !(queryCategory && (tool.category === queryCategory || tool.source === queryCategory))) continue;
+        if (!matchesQuery(hay) && !(queryCategory && (tool.category === queryCategory || tool.source === queryCategory || policy.categories[queryCategory]?.relatedTools?.includes(tool.name)))) continue;
       }
       matchedTools.push(tool);
     }
@@ -503,6 +504,7 @@ const QUERY_SYNONYMS = {
         '',
         'No matching items found. Suggestions:',
         '- Each query describes one operation; all its terms must match a single candidate. Search independent steps separately or browse their category.',
+        '- If instructions name a tool, try its exact name or mount it directly; zero keyword matches do not establish that it is unavailable.',
         `- Call \`${directoryCall}({ action: "catalog" })\` to inspect available category IDs.`,
         '- Try a shorter or more general search query.'
       );
@@ -1023,6 +1025,18 @@ const QUERY_SYNONYMS = {
     },
   });
 
+  function capabilityDiscovery(agent) {
+    if (!agent || !controller.ownsAgent(agent)) return [];
+    const available = viewHook.unfilteredView(agent).visible;
+    const semanticPolicy = { ...policy, initialTools: new Set() };
+    const categories = [...new Set([...available.keys()]
+      .filter(name => !['call_directory', 'run_code', 'structured_output'].includes(name))
+      .map(name => classifyTool(name, semanticPolicy)))].sort(compareNames);
+    return categories.length
+      ? [`Registered tool categories: ${categories.map(id => `\`${id}\``).join(', ')}. Category IDs organize discovery, not tool preference or execution order.`]
+      : [];
+  }
+
   function collaborationGuidance(agent) {
     if (agent && !controller.ownsAgent(agent)) return [];
     const available = viewHook.unfilteredView(agent).visible;
@@ -1052,12 +1066,13 @@ const QUERY_SYNONYMS = {
     text: context =>
       [
         `# Diffusion Mode · ${isPtcMode ? 'PTC' : 'Native'}`,
-        `call_directory exposes currently registered tools, content sources and skills. Available tools are directly callable; lookup is not a prerequisite.`,
+        `call_directory exposes currently registered tools, content sources and skills. Available tools are directly callable; lookup is not a prerequisite. Known exact names can be mounted directly.`,
         `${directoryCall}({action:"catalog"}) returns categories; ${directoryCall}({action:"lookup",query:"..."}) searches candidates (terms AND); ${directoryCall}({action:"detail",names:["exact"]}) mounts tools or loads skill:<name> instructions. Category lookup only browses; categories/wildcards in names mount whole sets.`,
         isPtcMode
           ? 'Inside run_code, await tools.<name>(args) invokes a mounted binding; newly mounted bindings appear in the next run_code.'
           : 'Mounted native tools are separate calls with their registered JSON arguments; directory examples are not shell commands.',
         'unload removes selected tools; reset restores the initial surface. Neither erases conversation history. Mounting changes visibility, not scope, permissions or approval requirements.',
+        ...capabilityDiscovery(context?.scope),
         ...collaborationGuidance(context?.scope),
       ].join('\n'),
   });
