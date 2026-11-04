@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://github.com/Cplay00/dsh-diffusion-preset/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-orange.svg" alt="dsh-plugin"></a>
-  <a href="https://github.com/Cplay00/dsh-diffusion-preset"><img src="https://img.shields.io/badge/version-1.2.4-emerald.svg" alt="Version"></a>
+  <a href="https://github.com/Cplay00/dsh-diffusion-preset"><img src="https://img.shields.io/badge/version-1.2.5-emerald.svg" alt="Version"></a>
 </p>
 
 [English](#english) | [中文说明](#中文说明) | [更新日志](CHANGELOG.md)
@@ -294,7 +294,7 @@ Windows 默认开放已注册的 `pwsh`。如果宿主也注册了 `win_bash`，
 
 兼容宿主须提供 `tools.view(scope)`（返回含 `visible: Map` 的视图）、`tools.register`、`systemPrompt.section`、`skills.list/get`、`workingDirectory.ensure`、Cordis 的事件及 effect 生命周期。预设隔离还依赖 DSH 的 `dsh.scope` 与工具层 `layers.scoped/chainLayers`；PTC 另外要求宿主提供 `run_code` 运行器和 `@deepseek-ai/dsh-agent-tool-presentation`。工具呈现插件也用于 Native 预设，以覆盖宿主默认值。完整预设的内置插件必须能由该 DSH 安装解析。
 
-目前实机验证版本为 **DSH 0.2.1-rc.3 / Windows**。兼容目标是满足上述契约的 DSH 实例，不能据单一版本保证所有历史版本、未来版本或精简发行版。Linux/macOS 的 shell 选择由补丁中的 `process.platform` 决定，尚未在这两个系统实机验证。
+**支持的 DSH 客户端版本**为 **`>=0.2.1-rc.3 <0.3.0`**，包括此范围内的 alpha 和 RC 预发布版本。Native 和 PTC 的会话创建已在 Windows 上验证，覆盖 `0.2.1-rc.3`、`0.2.1-rc.4`、`0.2.1-rc.5` 和 `0.2.2-rc.1`。Linux/macOS 的 shell 分支由 `process.platform` 选择。
 
 将运行时选项放入 `dsh-diffusion-preset/runtime-v2` 插件的 `config`；旧入口 `/runtime` 使用同一实现。Native 与 PTC 预设各自配置，`mode` 分别保留 `native` 或 `ptc`。
 
@@ -378,6 +378,8 @@ Traditional AI agent workflows inject full schemas for dozens of tools and volum
 ---
 
 ### 📦 Installation
+
+Supported DSH clients satisfy `>=0.2.1-rc.3 <0.3.0`, including alpha and RC versions within that range.
 
 ```bash
 dsh plugin add Cplay00/dsh-diffusion-preset
