@@ -4,7 +4,6 @@ export const INITIAL_TOOLS = new Set([
   'read',
   'write',
   'bash',
-  'win_bash',
   'pwsh',
   'ops_bash',
   'persistent_bash',

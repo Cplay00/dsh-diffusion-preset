@@ -10,6 +10,8 @@ Directory action examples:
 
 The default initial surface includes `read`, `write`, shell, image reading and `call_directory`, plus the PTC transport when applicable. Only registered tools appear; `initialTools` can replace this set. Available tools are directly callable; known names can be mounted directly. Directory actions describe discovery and visibility without prescribing an execution route.
 
+On Windows, registered `pwsh` is available initially. If the host also registers `win_bash`, it is discoverable under `terminal` and can be mounted by exact name. Its execution requires full access.
+
 - `call_directory({ query: "<operation>" })`: discover candidates without mounting.
 - `call_directory({ category: "file-search" })`: browse a category without mounting.
 - `call_directory({ names: ["read", "grep"] })`: mount the selected tools.

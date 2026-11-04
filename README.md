@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://github.com/Cplay00/dsh-diffusion-preset/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-orange.svg" alt="dsh-plugin"></a>
-  <a href="https://github.com/Cplay00/dsh-diffusion-preset"><img src="https://img.shields.io/badge/version-1.2.3-emerald.svg" alt="Version"></a>
+  <a href="https://github.com/Cplay00/dsh-diffusion-preset"><img src="https://img.shields.io/badge/version-1.2.4-emerald.svg" alt="Version"></a>
 </p>
 
 [English](#english) | [中文说明](#中文说明) | [更新日志](CHANGELOG.md)
@@ -284,7 +284,7 @@ PTC 的目录、翻页、挂载、卸载与守卫示例均使用 `await tools.ca
 
 已分配成员保留必要的身份和宿主规则。工具控制范围以注册契约为准，Team 专用控制不代表独立子智能体控制；`inactive` 状态本身不证明已得到有效结果。用户／工作区规则、只读要求及审批边界持续有效。
 
-Windows 宿主安装并注册 `win_bash` 后，它也属于默认初始 Shell 工具。该工具归入 `terminal`；是否可在当前权限模式执行，以工具自身契约为准。PowerShell 可继续处理 Windows 原生命令和受限模式下的任务。
+Windows 默认开放已注册的 `pwsh`。如果宿主也注册了 `win_bash`，可在 `terminal` 分类中找到它，或用 `call_directory({ action: "detail", names: ["win_bash"] })` 直接挂载。`win_bash` 仅在完整访问模式下执行。
 
 `guide: false` 可关闭运行时说明；目录尾部说明由 `usageReminder` 独立控制。用户自定义提示词和工具原生说明保留原文，预设不通过过滤它们实现中性化。
 
