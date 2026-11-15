@@ -444,69 +444,200 @@ const QUERY_SYNONYMS = {
       alternatives: [token, ...(Object.hasOwn(QUERY_SYNONYMS, token) ? QUERY_SYNONYMS[token] : [])].map(matcher),
     }));
     const searchText = text => `${text} ${text.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z])([A-Z][a-z])/g, '$1 $2')}`.toLowerCase();
-    const matchesQuery = hay => terms.every(term => term.alternatives.some(matches => matches(hay)));
-
-    const matchedTools = [];
-    const matchedSkills = [];
+    // AND across terms is the precise reading of one operation; ANY is the fallback when
+    // that reading finds nothing, so a slightly-wrong word still surfaces candidates.
+    const matchesQuery = (hay, mode = 'all') => (mode === 'all'
+      ? terms.every(term => term.alternatives.some(matches => matches(hay)))
+      : terms.some(term => term.alternatives.some(matches => matches(hay))));
 
     const includeAllCats = !rawCat || rawCat === 'all' || rawCat === '*';
     const wantSkillsCat = includeAllCats || rawCat === 'skills' || rawCat.startsWith('skill:');
 
-    for (const registered of allToolsMap.values()) {
-      const tool = registered.category === 'initial'
-        ? { ...registered, category: classifyTool(registered.name, semanticPolicy), source: classifyToolSource(registered.name, semanticPolicy) }
-        : registered;
-      const catMatch =
-        includeAllCats ||
-        policy.categories[rawCat]?.relatedTools?.includes(tool.name) ||
-        (rawCat === 'initial' && registered.category === 'initial') ||
-        tool.source?.toLowerCase() === rawCat ||
-        tool.source?.toLowerCase().split(':')[0] === rawCat ||
-        tool.category.toLowerCase() === rawCat ||
-        tool.category.toLowerCase().split(':')[0] === rawCat ||
-        tool.category.toLowerCase().split(':').slice(1).join(':') === rawCat;
-      if (!catMatch) continue;
-      if (rawTokens.length > 0) {
-        const hay = searchText(`${tool.name} ${tool.category} ${tool.source ?? ''} ${tool.description}`);
-        if (!matchesQuery(hay) && !(queryCategory && (tool.category === queryCategory || tool.source === queryCategory || policy.categories[queryCategory]?.relatedTools?.includes(tool.name)))) continue;
-      }
-      matchedTools.push(tool);
-    }
+    /** Does one candidate belong to the category/source selector requested (if any)? */
+    const inCategory = (tool, registered) =>
+      includeAllCats ||
+      policy.categories[rawCat]?.relatedTools?.includes(tool.name) ||
+      (rawCat === 'initial' && registered.category === 'initial') ||
+      tool.source?.toLowerCase() === rawCat ||
+      tool.source?.toLowerCase().split(':')[0] === rawCat ||
+      tool.category.toLowerCase() === rawCat ||
+      tool.category.toLowerCase().split(':')[0] === rawCat ||
+      tool.category.toLowerCase().split(':').slice(1).join(':') === rawCat;
 
-    if (wantSkillsCat) {
-      for (const skill of skills) {
-        if (rawCat.startsWith('skill:') && skill.name.toLowerCase() !== rawCat.slice(6)) continue;
-        if (rawTokens.length > 0) {
-          const hay = searchText(`${skill.name} ${skill.description}`);
-          if (!matchesQuery(hay)) continue;
+    /**
+     * Score a candidate against the query, weighted by where the match landed.
+     * A name hit is stronger evidence than a description hit, which is what keeps the
+     * relaxed pass from surfacing an unrelated provider that merely repeats a common word.
+     */
+    const FIELD_WEIGHTS = { name: 6, category: 3, source: 2, description: 1 };
+    const scoreCandidate = hay => {
+      let best = 0;
+      for (const [field, weight] of Object.entries(FIELD_WEIGHTS)) {
+        const text = hay[field];
+        if (!text) continue;
+        let hits = 0;
+        for (const term of terms) {
+          if (term.alternatives.some(matches => matches(text))) hits++;
         }
-        matchedSkills.push(skill);
+        if (hits) best = Math.max(best, hits * 100 + weight);
+      }
+      return best;
+    };
+    const termHits = hay => {
+      let hits = 0;
+      for (const term of terms) {
+        if (Object.values(hay).some(text => text && term.alternatives.some(matches => matches(text)))) hits++;
+      }
+      return hits;
+    };
+    /** Rich, per-field haystack so weighting does not have to re-split one blob. */
+    const fieldsOf = (name, category, source, description) => ({
+      name: searchText(name),
+      category: searchText(category ?? ''),
+      source: searchText(source ?? ''),
+      description: searchText(description ?? ''),
+    });
+
+    /** Collect candidates for one match mode; category filtering is identical for both. */
+    const collectMatches = (mode, minHits = 1) => {
+      const tools = [];
+      const skillHits = [];
+      for (const registered of allToolsMap.values()) {
+        const tool = registered.category === 'initial'
+          ? { ...registered, category: classifyTool(registered.name, semanticPolicy), source: classifyToolSource(registered.name, semanticPolicy) }
+          : registered;
+        if (!inCategory(tool, registered)) continue;
+        if (rawTokens.length > 0) {
+          const hay = fieldsOf(tool.name, tool.category, tool.source, tool.description);
+          const matched = matchesQuery(searchText(`${tool.name} ${tool.category} ${tool.source ?? ''} ${tool.description}`), mode);
+          if (!matched && !(queryCategory && (tool.category === queryCategory || tool.source === queryCategory || policy.categories[queryCategory]?.relatedTools?.includes(tool.name)))) continue;
+          if (mode === 'any' && termHits(hay) < minHits) continue;
+          tool._score = scoreCandidate(hay);
+          tool._hits = termHits(hay);
+        }
+        tools.push(tool);
+      }
+      if (wantSkillsCat) {
+        for (const skill of skills) {
+          if (rawCat.startsWith('skill:') && skill.name.toLowerCase() !== rawCat.slice(6)) continue;
+          if (rawTokens.length > 0) {
+            const hay = fieldsOf(skill.name, 'skills', '', skill.description);
+            const matched = matchesQuery(searchText(`${skill.name} ${skill.description}`), mode);
+            if (!matched) continue;
+            if (mode === 'any' && termHits(hay) < minHits) continue;
+            skill._score = scoreCandidate(hay);
+            skill._hits = termHits(hay);
+          }
+          skillHits.push(skill);
+        }
+      }
+      return { tools, skills: skillHits };
+    };
+
+    let result = collectMatches('all');
+    /** How far from an exact reading the answer is: 0 strict, 1 weakened, 2 best-effort. */
+    let fallbackLevel = 0;
+    let fallbackDetail = '';
+    let unmatchedTerms = [];
+
+    if (rawTokens.length > 1 && result.tools.length === 0 && result.skills.length === 0) {
+      const allHaystacks = [
+        ...[...allToolsMap.values()].map(tool => fieldsOf(tool.name, tool.category, tool.source, tool.description)),
+        ...skills.map(skill => fieldsOf(skill.name, 'skills', '', skill.description)),
+      ];
+      unmatchedTerms = terms
+        .map((term, index) => ({ term: rawTokens[index], alternatives: term.alternatives }))
+        .filter(entry => !allHaystacks.some(hay => Object.values(hay).some(text => text && entry.alternatives.some(matches => matches(text)))))
+        .map(entry => entry.term);
+      // A query term that matches nothing anywhere is information, not a reason to guess:
+      // report which word failed instead of returning loosely-related providers.
+      if (unmatchedTerms.length === 0) {
+        // Level 1: every term is real vocabulary, so accept candidates covering the most
+        // terms, and order them by field-weighted strength.
+        const bestHits = Math.max(...allHaystacks.map(termHits), 0);
+        if (bestHits >= 2) {
+          const partial = collectMatches('any', bestHits);
+          if (partial.tools.length || partial.skills.length) {
+            result = partial;
+            fallbackLevel = 1;
+            fallbackDetail = `${bestHits} of ${rawTokens.length}`;
+          }
+        }
+        // Level 2: still nothing at that tier. Drop the "most terms" bar and keep only
+        // candidates whose best match is a name, category or source rather than prose.
+        if (fallbackLevel === 0) {
+          // Collect once: every call re-walks all registered tools and skills.
+          const loose = collectMatches('any', 1);
+          const keptTools = loose.tools.filter(tool => (tool._score ?? 0) >= 100 + FIELD_WEIGHTS.category);
+          const keptSkills = loose.skills.filter(skill => (skill._score ?? 0) >= 100 + FIELD_WEIGHTS.category);
+          if (keptTools.length || keptSkills.length) {
+            result = { tools: keptTools, skills: keptSkills };
+            fallbackLevel = 2;
+            fallbackDetail = 'identifier matches only';
+          }
+        }
       }
     }
 
-    const matches = [
-      ...matchedTools.map(item => ({ ...item, kind: 'tool' })),
-      ...matchedSkills.map(item => ({ ...item, kind: 'skill' })),
-    ].sort((a, b) => compareNames(a.name, b.name) || compareNames(a.kind, b.kind));
+    // Ordering: the documented contract is A–Z so results are deterministic and independent
+    // of relevance or provider. A fallback is the one case where that order would bury the
+    // reason the fallback ran, so only there does match strength lead (A–Z still breaks ties).
+    const ordered = [...result.tools.map(item => ({ ...item, kind: 'tool' })), ...result.skills.map(item => ({ ...item, kind: 'skill' }))];
+    /** True when the identity fields carry the match; prose-only hits are weaker evidence. */
+    const identityHit = item => (item._score ?? 0) >= 100 + FIELD_WEIGHTS.category;
+    ordered.sort((a, b) => {
+      if (fallbackLevel > 0) {
+        const byClass = Number(identityHit(b)) - Number(identityHit(a));
+        if (byClass !== 0) return byClass;
+        const byScore = (b._score ?? 0) - (a._score ?? 0) || (b._hits ?? 0) - (a._hits ?? 0);
+        if (byScore !== 0) return byScore;
+      }
+      return compareNames(a.name, b.name) || compareNames(a.kind, b.kind);
+    });
+    // Tell the reader when weaker prose matches are trailing, so a broad query is not
+    // mistaken for "all of these are equally the thing you asked for".
+    const identityCount = ordered.filter(identityHit).length;
+    const proseOnlyCount = rawTokens.length > 0 ? ordered.length - identityCount : 0;
+    const matchedTools = ordered.filter(item => item.kind === 'tool');
+    const matchedSkills = ordered.filter(item => item.kind === 'skill');
+    const matches = ordered;
     const page = matches.slice(offset, offset + limit);
 
     const lines = [
       `# Call Directory · Lookup Results`,
       `- Search Criteria: category=\`${args.category || 'all'}\`, query=\`${args.query || '(none)'}\``,
       `- Matches: **${matchedTools.length}** tools, **${matchedSkills.length}** skills`,
+      ...(fallbackLevel === 1
+        ? [`- No entry matched every term. Showing entries that cover **${fallbackDetail}** terms, strongest match first; ask again with a single term to see the rest.`]
+        : []),
+      ...(fallbackLevel === 2
+        ? [`- No entry matched every term. Showing only entries whose own name, kind or source matched (${fallbackDetail}), strongest match first.`]
+        : []),
+      ...(rawTokens.length > 0 && proseOnlyCount > 0
+        ? [`- ${identityCount} entr${identityCount === 1 ? 'y' : 'ies'} matched in their own name, kind or source; the other ${proseOnlyCount} matched only in their description, so treat those as weaker candidates.`]
+        : []),
       '- Lookup only: no tools or skills were mounted.',
       ...(normalizeTokenList(args.names).length ? ['- `names` is ignored by lookup; use `query` to search names or action "detail" to mount a selection.'] : []),
       ...inventory.warnings.map(warning => `⚠️ ${warning}`),
     ];
 
     if (matchedTools.length === 0 && matchedSkills.length === 0) {
+      lines.push('');
+      if (unmatchedTerms.length) {
+        lines.push(
+          `No entries matched. These terms match nothing registered in this session: ${unmatchedTerms.map(term => `\`${term}\``).join(', ')}.`,
+          unmatchedTerms.length < rawTokens.length
+            ? '- The other terms did match something, so only the listed words are the problem. Replace them with the words this session actually uses, or ask by the exact entry name.'
+            : '- Either the capability is absent, or this session names it differently. A zero keyword match does not by itself prove it is unavailable.',
+          '- Asking for the overview of kinds first is usually faster than guessing more keywords.'
+        );
+        return lines.join('\n');
+      }
       lines.push(
-        '',
-        'No matching items found. Suggestions:',
-        '- Each query describes one operation; all its terms must match a single candidate. Search independent steps separately or browse their category.',
-        '- If instructions name a tool, try its exact name or mount it directly; zero keyword matches do not establish that it is unavailable.',
-        `- Call \`${directoryCall}({ action: "catalog" })\` to inspect available category IDs.`,
-        '- Try a shorter or more general search query.'
+        'No entries matched.',
+        '- One query should describe one operation; every term has to match the same entry. Independent steps need separate queries.',
+        '- If a name is already known, mounting it directly bypasses search entirely; a zero keyword match does not prove absence.',
+        '- Asking for the overview of kinds first is usually faster than guessing more keywords.'
       );
       return lines.join('\n');
     }
@@ -557,6 +688,12 @@ const QUERY_SYNONYMS = {
     const skillsToLoad = new Set();
     const unmatched = [];
     const ambiguous = [];
+    /** Token → how it resolved, so the report can distinguish an exact name from a whole set. */
+    const expansions = [];
+    const noteExpansion = (token, kind, label, names) => {
+      if (names.length <= 1) return;
+      expansions.push({ token, kind, label, count: names.length });
+    };
     let unlockAll = false;
 
     for (const token of requestedTokens) {
@@ -612,6 +749,7 @@ const QUERY_SYNONYMS = {
       const sourceTools = toolsForSource(allToolsMap, resolved);
       if (sourceTools.length) {
         for (const tool of sourceTools) toolsToUnlock.add(tool.name);
+        noteExpansion(token, 'source', resolved, sourceTools);
         continue;
       }
 
@@ -621,6 +759,7 @@ const QUERY_SYNONYMS = {
           if (allToolNames.has('skill')) toolsToUnlock.add('skill');
         } else {
           for (const t of cat.tools) toolsToUnlock.add(t.name);
+          noteExpansion(token, resolved === lower ? 'category' : 'alias', cat.id, [...cat.tools]);
         }
         continue;
       }
@@ -632,6 +771,7 @@ const QUERY_SYNONYMS = {
       }
       if (suffixCategories.length === 1) {
         for (const tool of suffixCategories[0].tools) toolsToUnlock.add(tool.name);
+        noteExpansion(token, 'category', suffixCategories[0].id, [...suffixCategories[0].tools]);
         continue;
       }
 
@@ -729,6 +869,11 @@ const QUERY_SYNONYMS = {
           ? '> Calling syntax (PTC Mode): Call via `await tools.<name>(args)` in subsequent `run_code` execution.'
           : '> Calling syntax (Standard Mode): Native schemas are now mounted in the session; call them directly as native function calls in subsequent turns.'
       );
+      // Whole-set selections are how a "precise name" silently becomes a large mount;
+      // naming the expansion lets the caller see that and unload what it did not need.
+      for (const expansion of expansions) {
+        lines.push(`> \`${expansion.token}\` resolved as ${expansion.kind} \`${expansion.label}\` and mounted ${expansion.count} tools. Mount exact names instead to keep the set smaller.`);
+      }
     }
 
     if (failedSkills.length > 0) {
@@ -850,6 +995,9 @@ const QUERY_SYNONYMS = {
     }
 
     const unloadedRecord = [];
+    /** Split "already off" from "no such tool": the old single message could not tell them apart. */
+    const alreadyOff = [];
+    const initialKept = [];
     if (agent && controller.ownsAgent(agent)) {
       const state = getAgentState(agent);
       state.pruneRevision++;
@@ -863,11 +1011,14 @@ const QUERY_SYNONYMS = {
         unloadedRecord.push('*');
       } else {
         for (const tName of toolsToUnload) {
-          if (!INITIAL_TOOLS.has(tName) && controller.isToolVisible(agent, tName)) {
+          if (INITIAL_TOOLS.has(tName)) { initialKept.push(tName); continue; }
+          if (controller.isToolVisible(agent, tName)) {
             state.logged.delete(tName);
             state.inFlight.delete(tName);
             state.excluded.add(tName);
             unloadedRecord.push(tName);
+          } else {
+            alreadyOff.push(tName);
           }
         }
       }
@@ -878,6 +1029,18 @@ const QUERY_SYNONYMS = {
       }
     }
 
+    const unresolvedTokens = requestedTokens.filter(token => {
+      if (isReset) return false;
+      const lower = token.toLowerCase();
+      if (lower === '*' || lower.toLowerCase() === 'all') return false;
+      const resolved = CATEGORY_ALIASES[lower] ?? lower;
+      return !allToolsMap.has(token) && !allToolsMap.has(resolved)
+        && !toolsForSource(allToolsMap, resolved).length
+        && !categories.has(resolved)
+        && ![...categories.values()].some(cat => cat.id.endsWith(`:${resolved}`))
+        && ![...allToolNames].some(tName => tName.toLowerCase() === lower || tName.toLowerCase() === resolved);
+    });
+
     const lines = [
       '# Call Directory · Dynamic Unload Results',
       ...ambiguous.map(({ token, categories }) => ambiguousCategoryMessage(token, categories)),
@@ -886,7 +1049,10 @@ const QUERY_SYNONYMS = {
         ? '🔄 **Current session has been reset to the minimal initial state** (only basic tools retained).'
         : unloadedRecord.length > 0
           ? `🔻 **Successfully unloaded tools (${unloadedRecord.length})**: ${unloadedRecord.sort(compareNames).map(t => `\`${t}\``).join(', ')}`
-          : '⚠️ **No matching tools found to unload** (they may not have been unlocked or names did not match).',
+          : '⚠️ **Nothing changed by this call.**',
+      ...(alreadyOff.length ? [`- Already not mounted, so nothing to remove: ${alreadyOff.sort(compareNames).map(t => `\`${t}\``).join(', ')}.`] : []),
+      ...(initialKept.length ? [`- Always available in the initial set and not unloadable: ${initialKept.sort(compareNames).map(t => `\`${t}\``).join(', ')}. Use \`reset\` semantics only for mounted tools; initial tools stay reachable by design.`] : []),
+      ...(unresolvedTokens.length ? [`- No registered tool or category matches: ${unresolvedTokens.sort(compareNames).map(t => `\`${t}\``).join(', ')}. Check the exact name with \`${directoryCall}({ action: "lookup", query: "<keyword>" })\`. Names are case-sensitive here.`] : []),
       '',
       `Note: Unloaded tools can be re-mounted at any time via \`${directoryCall}({ action: "detail", names: [...] })\`.`,
     ];
@@ -1025,16 +1191,83 @@ const QUERY_SYNONYMS = {
     },
   });
 
+  /**
+   * Category count only. Deliberately no tool names, no call syntax and no category IDs:
+   * a resident prompt that names specific capabilities steers later turns toward them.
+   * The registered tool schema carries the syntax; the directory carries the inventory.
+   *
+   * Counted the same way the directory counts them: categories that hold nothing beyond the
+   * initial surface are dropped there, so counting them here would advertise kinds the
+   * reader cannot find when it asks for the overview.
+   */
   function capabilityDiscovery(agent) {
     if (!agent || !controller.ownsAgent(agent)) return [];
     const available = viewHook.unfilteredView(agent).visible;
     const semanticPolicy = { ...policy, initialTools: new Set() };
-    const categories = [...new Set([...available.keys()]
-      .filter(name => !['call_directory', 'run_code', 'structured_output'].includes(name))
-      .map(name => classifyTool(name, semanticPolicy)))].sort(compareNames);
-    return categories.length
-      ? [`Registered tool categories: ${categories.map(id => `\`${id}\``).join(', ')}. Category IDs organize discovery, not tool preference or execution order.`]
-      : [];
+    const extendedKinds = new Set();
+    for (const name of available.keys()) {
+      if (['call_directory', 'run_code', 'structured_output'].includes(name)) continue;
+      // A tool already in the initial surface is not itself a discoverable kind.
+      if (INITIAL_TOOLS.has(name)) continue;
+      extendedKinds.add(classifyTool(name, semanticPolicy));
+    }
+    if (!extendedKinds.size) return [];
+    return [
+      `Registered capabilities in this session are organised into ${extendedKinds.size} kinds, and some are not yet available.`,
+    ];
+  }
+
+  /**
+   * Operations a shell command can stand in for, described by effect rather than by name.
+   * Matching stays narrow so ordinary Git/build/test shell work is never interrupted.
+   */
+  const SHELL_FILE_SEARCH_PATTERN = /\b(?:Get-ChildItem|gci|dir|find|fd)\b/i;
+  const SHELL_CONTENT_SEARCH_PATTERN = /\b(?:Select-String|findstr|rg|ag|grep|egrep|ack|Where-Object)\b/i;
+  const SHELL_SEARCH_PATTERNS = [SHELL_FILE_SEARCH_PATTERN, SHELL_CONTENT_SEARCH_PATTERN];
+  const SHELL_TOOL_NAMES = new Set(['pwsh', 'bash', 'win_bash', 'ops_bash', 'persistent_bash', 'persistent_pwsh']);
+  /** Per-agent flag: a shell command already covered work a dedicated capability could do. */
+  const shellSubstitutionSeen = new WeakSet();
+
+  /**
+   * Is there actually a dedicated capability registered for this kind of work?
+   * The reminder must not claim "this session can do it directly" on a host that has no such
+   * capability at all — that would be advice the reader cannot act on.
+   */
+  function hasDedicatedSearchCapability(agent) {
+    // Ask the same classifier the directory uses, so this follows real registration rather
+    // than a hardcoded name list that some hosts do not have.
+    const available = viewHook.unfilteredView(agent).visible;
+    const semanticPolicy = { ...policy, initialTools: new Set() };
+    for (const name of available.keys()) {
+      if (SHELL_TOOL_NAMES.has(name)) continue;
+      if (classifyTool(name, semanticPolicy) === 'file-search') return true;
+    }
+    return false;
+  }
+
+  /** Remember that a shell command stood in for an operation this session can do natively. */
+  function recordSearchSubstitute(agent, toolName, args) {
+    if (!agent || shellSubstitutionSeen.has(agent)) return;
+    if (!SHELL_TOOL_NAMES.has(toolName)) return;
+    const command = typeof args?.command === 'string' ? args.command
+      : typeof args?.script === 'string' ? args.script : '';
+    if (!command) return;
+    if (!SHELL_SEARCH_PATTERNS.some(pattern => pattern.test(command))) return;
+    if (!hasDedicatedSearchCapability(agent)) return;
+    shellSubstitutionSeen.add(agent);
+  }
+
+  /**
+   * Remind once that this session can search natively, without naming any capability.
+   * Naming one would bias later turns toward it; describing the effect does not.
+   */
+  function searchSubstituteLines(agent) {
+    if (!agent || !shellSubstitutionSeen.has(agent)) return [];
+    if (!controller.ownsAgent(agent)) return [];
+    return [
+      '',
+      'A shell command here performed an operation that this session can also do directly, without shell quoting or text post-processing. If that happens repeatedly, check whether a registered capability already covers it before building another shell pipeline. This note appears once per session.',
+    ];
   }
 
   function collaborationGuidance(agent) {
@@ -1058,23 +1291,29 @@ const QUERY_SYNONYMS = {
     ];
   }
 
-  // Register Diffusion Mode prompt section
+  // Register Diffusion Mode prompt section.
+  // The resident guide describes only the *shape* of this environment. It names no tool,
+  // no action and no argument: the registered tool schema already carries the syntax, and
+  // naming capabilities here biases later turns toward them instead of toward the task.
+  // It does still say that an on-demand entry exists, because a guide that says only
+  // "some things are unavailable" leaves the reader with no reason to look for that entry.
   if (config.guide !== false) ctx.systemPrompt.section({
     name: 'diffusion:guide',
     order: 700,
     interpolate: false,
-    text: context =>
-      [
+    text: context => {
+      return [
         `# Diffusion Mode · ${isPtcMode ? 'PTC' : 'Native'}`,
-        `call_directory exposes currently registered tools, content sources and skills. Available tools are directly callable; lookup is not a prerequisite. Known exact names can be mounted directly.`,
-        `${directoryCall}({action:"catalog"}) returns categories; ${directoryCall}({action:"lookup",query:"..."}) searches candidates (terms AND); ${directoryCall}({action:"detail",names:["exact"]}) mounts tools or loads skill:<name> instructions. Category lookup only browses; categories/wildcards in names mount whole sets.`,
-        isPtcMode
-          ? 'Inside run_code, await tools.<name>(args) invokes a mounted binding; newly mounted bindings appear in the next run_code.'
-          : 'Mounted native tools are separate calls with their registered JSON arguments; directory examples are not shell commands.',
-        'unload removes selected tools; reset restores the initial surface. Neither erases conversation history. Mounting changes visibility, not scope, permissions or approval requirements.',
+        'Only a minimal set of capabilities is available right now. More are registered in this session but not yet available, and they can be made available on demand rather than all at once.',
+        'One of the capabilities you do have is a directory: it can show what is registered here and make a chosen capability available. It is listed with your tools; its schema describes how to use it.',
+        'Capabilities that are already available can be used directly; a search step is not a prerequisite for anything. Anything not yet available can be made available by name when it is known, or found by describing the operation you need.',
+        'Availability is separate from scope: making a capability available does not change user or workspace rules, permissions, or approval requirements, and it does not erase conversation history.',
+        'Making a capability available is reversible: anything added on demand can be withdrawn later to keep the working set small.',
         ...capabilityDiscovery(context?.scope),
         ...collaborationGuidance(context?.scope),
-      ].join('\n'),
+        ...searchSubstituteLines(context?.scope),
+      ].join('\n');
+    },
   });
 
   // Reveal operation instructions with their tools; keep unrelated policy and unknown sections intact.
@@ -1182,7 +1421,20 @@ const QUERY_SYNONYMS = {
   ctx.on('tools/post-execute', async (exec, result, next) => {
     const decision = await next();
     const agent = exec?.agent;
-    if (!result?.isError || !agent || !controller.ownsAgent(agent)) {
+    if (!agent || !controller.ownsAgent(agent)) return decision;
+
+    // Record a substitution when a shell command covered a registered-but-locked search tool.
+    // The note rides the next system prompt; the tool result itself is left untouched.
+    if (decision.kind === 'accept' && !result?.isError) {
+      try {
+        recordSearchSubstitute(agent, exec?.name, exec?.arguments);
+      } catch {
+        // Optional guidance must not turn a successful command into a failed result.
+      }
+      return decision;
+    }
+
+    if (!result?.isError) {
       return decision;
     }
     const toolName = exec?.name;
@@ -1191,7 +1443,7 @@ const QUERY_SYNONYMS = {
       !controller.isToolVisible(agent, toolName) &&
       viewHook.unfilteredView(agent).visible.has(toolName)
     ) {
-      const msg = `Error: Tool "${toolName}" exists in this harness but is currently locked in Diffusion Mode. Directory actions: lookup metadata via \`${directoryCall}({ action: "lookup", query: "${toolName}" })\` or call \`${directoryCall}({ action: "detail", names: [${JSON.stringify(toolName)}] })\` to unlock it.`;
+      const msg = `Error: Tool "${toolName}" exists in this harness but is currently locked in Diffusion Mode. Directory actions: lookup metadata via \`${directoryCall}({ action: "lookup", query: "${toolName}" })\` or call \`${directoryCall}({ action: "detail", names: [${JSON.stringify(toolName)}] })}\` to unlock it.`;
       return {
         kind: 'block',
         feedback: [{ type: 'text', text: msg }],

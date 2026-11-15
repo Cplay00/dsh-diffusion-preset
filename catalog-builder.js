@@ -1,4 +1,8 @@
-/** Tools that belong to the initial Minimal Mode surface and are always available from step 1. */
+/**
+ * Mode-independent baseline surface, always available from step 1.
+ * PTC transport is NOT listed here: it is appended only when mode === 'ptc', so a Native
+ * session on a host that happens to register run_code does not silently expose it.
+ */
 export const INITIAL_TOOLS = new Set([
   'call_directory',
   'read',
@@ -9,8 +13,6 @@ export const INITIAL_TOOLS = new Set([
   'persistent_bash',
   'persistent_pwsh',
   'read_image',
-  'run_code',
-  'structured_output',
 ]);
 
 /** Automatic sibling mounting is opt-in; exact names stay exact by default. */

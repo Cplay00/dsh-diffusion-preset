@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://github.com/Cplay00/dsh-diffusion-preset/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/topic-dsh--plugin-orange.svg" alt="dsh-plugin"></a>
-  <a href="https://github.com/Cplay00/dsh-diffusion-preset"><img src="https://img.shields.io/badge/version-1.2.5-emerald.svg" alt="Version"></a>
+  <a href="https://github.com/Cplay00/dsh-diffusion-preset"><img src="https://img.shields.io/badge/version-1.2.6-emerald.svg" alt="Version"></a>
 </p>
 
 [English](#english) | [中文说明](#中文说明) | [更新日志](CHANGELOG.md)
@@ -56,6 +56,8 @@
 ---
 
 ### 📦 安装方式
+
+**ZCode 用户**：仓库另提供基于 ZCode 原生 ToolSearch 的[独立兼容版](zcode/README.md)，支持按需发现和加载工具；其能力边界与 DSH 预设不同，详见兼容说明。
 
 在 DeepSeek Harness 终端中执行：
 
@@ -276,9 +278,34 @@ PTC 的目录、翻页、挂载、卸载与守卫示例均使用 `await tools.ca
 
 通用检索词扩展为能力词，不额外加入特定提供方名称。精确名称、功能分类及来源选择器保留原有匹配范围；所有匹配结果统一按名称 A–Z 展示，不采用相关度或提供方加权。
 
+#### 常驻引导的中性约束
+
+常驻引导只说明**环境形态**，不出现任何工具名、动作名或参数语法。它叙述的是可用性契约：当前只开放最小集合、其余已注册可按需启用、启用不改变范围与权限、启用可撤销。具体语法由 `call_directory` 自身的 Schema 提供，目录内容由 `catalog`/`lookup` 提供，因此引导本身没有可被模型"抓住依赖"的抓手。
+
+引导仍会用一句功能性描述说明"存在一个可以查看并启用能力的目录入口，它就在你的工具列表里，用法见其 Schema"。这句不含任何名称，但保留了"有东西可以找"的线索——实测中缺少这句时，模型更倾向直接用 shell 完成全部工作而从不查看目录。
+
+分类信息同样只给数量（"organised into N kinds"），不列举分类 ID，也不点名任何尚未启用的能力。宿主已注册但未启用的常用替代工具不再在引导中列出：点名会诱导模型跳过按需发现，直接去启用被点到的那个。
+
+#### 检索回退、整类标注与替代提示
+
+**多词检索的分级回退。** 多个检索词默认按 AND 匹配同一个候选。零命中时按两级回退：
+
+1. **词齐全但未同现**：每个词本身都能在当前作用域匹配到内容，说明只是没有落在同一个候选上。此时接受覆盖词数最多的候选，并在首行注明覆盖了几个词中的几个；更少词的条目被丢弃，避免一句偶然命中带来整屏无关结果。
+2. **仍无结果**：放宽到仅保留在**名称、分类或来源**上命中的条目，剔除只在描述里凑巧出现的候选。
+
+若某个词在任何条目中都不出现，则**不回退**：报告直接指出是哪个词没有匹配，并区分"其他词有匹配"和"全部词都不存在"两种情况。这样既不会把"换个说法"变成查不到，也不会把无关结果伪装成能力存在。
+
+**强弱标注与排序。** 任何带检索词的结果都会说明其中多少条命中在名称/分类/来源、多少条仅命中在描述，后者标为较弱候选。没有回退时结果仍严格按名称 A–Z 排列（不采用相关度或提供方加权）；只有发生回退时才让匹配强度优先，A–Z 仍用于打平。
+
+**整类展开会在挂载报告中标注。** 用分类、别名、来源或通配符选中一组工具时，报告会写明 `<输入> resolved as <类型> <规范 ID> and mounted N tools`，并提示如需更小的集合应改用精确名称。精确名称挂载不产生这条说明。挂载报告中的 `unlocked` 数组只是可用性记录，长度不等于新增数量，以报告正文的新增/已可用计数为准。
+
+**shell 替代时提醒一次，且不点名。** 若 shell 命令（列目录、按内容检索等）完成了本可由会话内某项能力直接承担的工作，下一轮系统提示会追加一句说明，提示先确认已有能力是否已覆盖该操作，而不是继续搭建 shell 管道。该说明不出现任何工具名或调用语法，不修改工具结果，每个会话至多一次；Git、构建、测试等普通 shell 工作不触发。
+
+**卸载结果区分三种情况。** `unload` 未改变任何状态时，报告会分别说明：名字确实存在但本来就未挂载、属于初始工具集因而不可卸载、以及根本没有匹配的已注册工具或分类（最后一种会提示用 `lookup` 核对名称，并说明名称在此处区分大小写）。这避免了"已卸载"和"名字打错"共用一句含糊提示。
+
 #### 协作能力与契约
 
-预设只负责能力发现与调用说明，不建议何时委派、是否并行、选择独立子智能体还是团队，也不规定团队规模。初始提示将当前作用域实际注册的工具按分类 ID 统一列出并按 A–Z 排序，不单独突出协作能力；完整参数仍按需挂载。已知名称可直接挂载，多词检索无匹配不代表工具不存在。
+预设只负责能力发现与调用说明，不建议何时委派、是否并行、选择独立子智能体还是团队，也不规定团队规模。初始提示只给出当前作用域注册的能力种类数量，不列举分类 ID，也不点名任何尚未启用的能力；完整分类与候选通过 `catalog`/`lookup` 获取。不单独突出协作能力；完整参数仍按需挂载。已知名称可直接挂载，多词检索无匹配不代表工具不存在。
 
 相关工具挂载后，补充其上下文和控制范围：`subagent` 使用独立任务上下文，`subagent_fork` 继承已完成的会话历史，`spawn_teammate` 创建持久团队成员。当前轮输入遵循启动工具的实际契约。`team` 分类检索也可发现已注册的共享控制工具 `list_agents`、`send_message`、`interrupt_agent`，保留它们原有的分类、来源和原生说明；按名称只挂载所选工具，显式整类挂载仍按分类自身的工具集合执行。
 
@@ -312,6 +339,7 @@ Windows 默认开放已注册的 `pwsh`。如果宿主也注册了 `win_bash`，
 | `inferSkillCompanions` | 默认 `false`。设为 `true` 后按技能领域关键词推断依赖，可能展开整个领域；开启后可能扩大挂载范围。 |
 | `guide` | `false` 关闭系统提示中的运行时说明；目录中的分类说明由 `categoryGuidance` 独立控制。 |
 | `usageReminder` | 自定义目录尾部说明，或用 `false` 关闭；默认只说明分类、排序和挂载语义，不推荐分类、工具或提供方。 |
+| `autoUnlockOnDemand` | 默认 `false`。设为 `true` 时，模型直接调用已注册但未挂载的工具会先自动挂载再放行，而不是返回门禁拒绝；被放行的工具会记录到会话日志，`unload` 仍可卸载。 |
 
 例如运行时配置：
 
@@ -362,7 +390,7 @@ catalogPath: Diffusion Mode Call Directory.md
 
 Traditional AI agent workflows inject full schemas for dozens of tools and voluminous system instructions upfront. This wastes token budget and disperses model attention on simple tasks.
 
-**Diffusion Mode** starts from a lightweight baseline (text reader `read`, file writer `write`, shell, image reader, and `call_directory`; PTC also retains its transport). Available tools are directly callable, known names can be mounted directly, and the directory exposes discovery and visibility actions without prescribing a tool, provider or sequence. Matching tools and skills share name A–Z order before pagination, without relevance or provider boosts. Category overviews use category ID order; mount, unload and returned skill lists also use name order. Initial tools remain searchable as `[Unlocked]` and need no mounting. The initial set is configurable and only registered tools appear.
+**Diffusion Mode** starts from a lightweight baseline (text reader `read`, file writer `write`, shell, image reader, and `call_directory`; PTC also retains its transport). Available tools are directly callable, known names can be mounted directly, and the directory exposes discovery and visibility actions without prescribing a tool, provider or sequence. Matching tools and skills share name A–Z order before pagination, without relevance or provider boosts; the only exception is a graded fallback, where match strength leads and A–Z breaks ties. Category overviews use category ID order; mount, unload and returned skill lists also use name order. Initial tools remain searchable as `[Unlocked]` and need no mounting. The initial set is configurable and only registered tools appear.
 
 ### 🌟 Key Highlights
 
@@ -370,8 +398,11 @@ Traditional AI agent workflows inject full schemas for dozens of tools and volum
 - **Dynamic Scoped Discovery**: Automatically inspects, categorizes, and organizes tools and skills actually installed in the current harness, without rigid external hardcoding.
 - **Capability Discovery**: `lookup` returns registered candidates without mounting; direct calls to available tools and direct mounting of known names remain supported.
 - **Exact Mounting by Default**: Mount only selected names. Automatic companion groups, skill dependency maps, and domain inference are opt-in. Categories and wildcards still allow explicit whole-set expansion.
+- **Neutral Resident Guidance**: The always-on guide describes the availability contract only — no tool names, no action names and no argument syntax, so it cannot anchor later turns onto a particular capability. Category kinds are reported as a count; their IDs and candidates come from the directory on demand.
 - **Efficient, Read-Only Lookup**: Multilingual search with synonym expansion returns matching candidates with concise summaries. Lookup never dumps heavy parameter schemas or skill bodies.
+- **Graded Search Fallback**: When no entry matches every term, lookup first accepts the entries covering the most terms, then narrows to entries matched on name, kind or source. A term that matches nothing anywhere is reported as such instead of being relaxed away, and results state how many entries matched only in prose.
 - **Execution Guard**: Pre-execution gate intercepts locked tool calls before dispatch, reporting visibility state and lookup/mount syntax.
+- **Unaided Discovery Keeps Working**: Because the guide names nothing, capability discovery stays driven by the task and the directory rather than by a preselected tool.
 - **Dynamic Unloading**: Supports `action: "unload"` and `action: "reset"` to prune tokens during long-horizon sessions.
 - **Dual Preset Architectures**: Works out-of-the-box in both Native Function Calling and PTC (Programmable Tool Calling) environments.
 
