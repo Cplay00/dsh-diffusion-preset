@@ -57,8 +57,6 @@
 
 ### 📦 安装方式
 
-**ZCode 用户**：仓库另提供基于 ZCode 原生 ToolSearch 的[独立兼容版](zcode/README.md)，支持按需发现和加载工具；其能力边界与 DSH 预设不同，详见兼容说明。
-
 在 DeepSeek Harness 终端中执行：
 
 ```bash

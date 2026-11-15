@@ -33,3 +33,6 @@ preset-status.json
 *.snapshot.json
 扩散模式调用目录.md
 Diffusion Mode Call Directory.md
+
+# Local ZCode compatibility package, kept outside this repository
+/zcode/

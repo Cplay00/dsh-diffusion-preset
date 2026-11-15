@@ -15,11 +15,6 @@
 - 修复 `scripts/audit-tool-control.mjs` 与 `scripts/audit-prompt-hygiene.mjs` 中与现行行为不符的过期断言，质量评估链恢复可用。
 - README 补充 `autoUnlockOnDemand` 选项，并说明中性引导、分级回退、整类标注与替代提醒的边界。
 
-## ZCode 原生兼容包 0.1.0
-
-- 新增独立的 `zcode/` 本地插件市场及 `diffusion` 插件，包含 SessionStart 指引、扩散模式技能与 `/call-directory` 命令，使用 ZCode 原生 ToolSearch 按需发现和加载工具定义。
-- 明确 native 与 local 调用协议及能力边界：此兼容包不提供 DSH `call_directory` 工具、逐工具卸载、reset 或 PTC；保留宿主常驻工具集合与权限检查。
-
 ## 1.2.5 · 2026-11-04
 
 - 修复 DSH `0.2.2-rc.1` 上 Native 和 PTC 扩散预设加载失败，导致「新会话」报 `agent-preset/invalid` 的问题。新版宿主从主插件注册 `list_agents`，旧版宿主仍按其导出加载独立入口。
