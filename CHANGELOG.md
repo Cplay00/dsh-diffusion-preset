@@ -1,6 +1,6 @@
 # 更新日志
 
-## Unreleased
+## 1.2.7 · 2026-11-23
 
 - **宿主提示风控兼容层**：新增 `promptRiskControl`，默认 `neutral`。按段名 + 签名匹配 DSH 宿主注入的四段运行时说明（`harness:source`、`app:web-surface`、`tool:pty-panel`、`ui:deliverable-file-references`）以及两条运行时上下文标识，将其重写为保留语义、去掉品牌与内部实现细节的中性文本；`strip` 直接移除这些段与上下文，`false` 保留宿主原文。签名不匹配时原样放行，不触碰用户自定义提示词、未知提示段或工具 Schema。
 - **实测依据**：同一份原始请求在 `gemini-4-hydrogen-high` 上返回 429（HTTP 403 包裹 `RESOURCE_EXHAUSTED`）；应用 `neutral` 后返回 200，`strip` 与 `strip + write` 同样返回 200。触发面与账号配额无关，短变体在同一账号上可正常返回。
