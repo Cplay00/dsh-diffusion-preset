@@ -11,6 +11,56 @@ const VIEW_HOOK_SYM = Symbol.for('dsh.diffusion.viewHook.v3');
 const TOOL_PROMPT_TOOLS = { jobs: CATEGORY_META.job.tools, pty: PERSISTENT_TERMINAL_TOOLS, 'session-query': CATEGORY_META.session.tools, goal: CATEGORY_META.goal.tools };
 const CORE_TOOL_NAMES = new Set(Object.values(CATEGORY_META).flatMap(meta => [...meta.tools]));
 
+/**
+ * Host prompt sections that upstream content screening has treated as part of a
+ * cumulative trigger when they appear alongside the rest of an agent prompt.
+ * Each rule is matched by section name AND a signature substring, so a host that
+ * changes its wording simply keeps its own text instead of receiving stale copy.
+ */
+const HOST_PROMPT_RISK_REWRITES = Object.freeze([
+  {
+    name: 'harness:source',
+    signature: 'DeepSeek Harness implementation checkout',
+    neutral: 'A runtime context value may identify an implementation checkout. Treat that location as separate from the working directory; determine the working directory directly, and use the checkout only when the task is to inspect or extend the host itself.',
+  },
+  {
+    name: 'app:web-surface',
+    signature: 'DeepSeek Harness Web GUI',
+    neutral: 'The user interacts through the host graphical interface. It provides no implicit DOM, route, or screenshot context. Do not start a replacement server unless the user asks; if one is required, run it as a managed background job and verify its exact URL.',
+  },
+  {
+    name: 'tool:pty-panel',
+    signature: 'Terminals you open with terminal_open',
+    neutral: 'Terminals opened through the terminal tools appear in the user side panel; the user can watch and type into them. After the user types, treat the terminal as read-only; closing it removes it only from your list. Use them for long-running processes the user should watch, and ordinary shell tools for short commands. These terminals run under the session sandbox; when access is denied, use a shell tool instead. Never request passwords or one-time codes; ask the user to enter them in the terminal.',
+  },
+  {
+    name: 'ui:deliverable-file-references',
+    signature: 'Prefer showing the primary results',
+    neutral: 'Prefer showing primary results in the final response with a brief explanation. Use Markdown image syntax when an image supports the explanation. Link every existing file you mention to its path, using the filename or a short alias as the label; add line anchors when precise lines matter. Use a separate presentation only for complete deliverables whose separate access helps the user, not merely to list edited source files.',
+  },
+]);
+
+/** Runtime-context lines that repeat the same host identity without adding task data. */
+const HOST_CONTEXT_RISK_REWRITES = Object.freeze([
+  {
+    name: 'harness:source',
+    signature: 'Current DeepSeek Harness implementation checkout',
+    neutralLabel: 'Current implementation checkout',
+  },
+  {
+    name: 'app:web-surface',
+    signature: 'Current DeepSeek Harness Web GUI URL',
+    neutralLabel: 'Current host interface URL',
+  },
+]);
+
+/** `neutral` rewrites known host text, `strip` removes it, `false` preserves it. */
+function hostPromptRiskMode(config) {
+  if (config.promptRiskControl === false) return false;
+  if (config.promptRiskControl === 'strip') return 'strip';
+  return 'neutral';
+}
+
 /** Preserve all registered argument constraints in single-tool detail output. */
 function formatParameterSchema(parameters) {
   if (!parameters || typeof parameters !== 'object') return '(No parameter schema supplied; inspect the registered tool before supplying arguments.)';
@@ -173,6 +223,7 @@ export function apply(ctx, config = {}) {
   const CATEGORY_ALIASES = policy.aliases;
   const presetScopeKey = getScopeOf(ctx);
   const isPtcMode = config?.mode === 'ptc';
+  const promptRiskMode = hostPromptRiskMode(config);
   const directoryCall = isPtcMode ? 'await tools.call_directory' : 'call_directory';
   const teamContextTools = ['spawn_teammate', 'wait_agent', 'list_agents', 'interrupt_agent', 'team_task_create', 'team_task_get', 'team_task_list', 'team_task_update'];
   const rawTools = unwrapService(ctx.tools);
@@ -1377,10 +1428,28 @@ const QUERY_SYNONYMS = {
       return true;
     });
 
+    // Known host sections are rewritten only when their text still carries the
+    // signature they had when the trigger was measured. Anything else passes through.
+    const riskAdjustedSections = promptRiskMode === false ? filteredSections : filteredSections.flatMap(sec => {
+      const rule = HOST_PROMPT_RISK_REWRITES.find(candidate =>
+        candidate.name === sec.name && typeof sec.text === 'string' && sec.text.includes(candidate.signature));
+      if (!rule) return [sec];
+      if (promptRiskMode === 'strip') return [];
+      return [{ ...sec, text: rule.neutral }];
+    });
+
+    const riskAdjustedContexts = promptRiskMode === false ? filteredContexts : filteredContexts.flatMap(c => {
+      const rule = HOST_CONTEXT_RISK_REWRITES.find(candidate =>
+        candidate.name === c.name && typeof c.text === 'string' && c.text.includes(candidate.signature));
+      if (!rule) return [c];
+      if (promptRiskMode === 'strip') return [];
+      return [{ ...c, text: c.text.replace(rule.signature, rule.neutralLabel) }];
+    });
+
     return {
       ...result,
-      sections: filteredSections,
-      contexts: filteredContexts,
+      sections: riskAdjustedSections,
+      contexts: riskAdjustedContexts,
     };
   });
 

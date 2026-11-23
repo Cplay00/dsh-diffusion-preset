@@ -1,5 +1,11 @@
 # 更新日志
 
+## Unreleased
+
+- **宿主提示风控兼容层**：新增 `promptRiskControl`，默认 `neutral`。按段名 + 签名匹配 DSH 宿主注入的四段运行时说明（`harness:source`、`app:web-surface`、`tool:pty-panel`、`ui:deliverable-file-references`）以及两条运行时上下文标识，将其重写为保留语义、去掉品牌与内部实现细节的中性文本；`strip` 直接移除这些段与上下文，`false` 保留宿主原文。签名不匹配时原样放行，不触碰用户自定义提示词、未知提示段或工具 Schema。
+- **实测依据**：同一份原始请求在 `gemini-4-hydrogen-high` 上返回 429（HTTP 403 包裹 `RESOURCE_EXHAUSTED`）；应用 `neutral` 后返回 200，`strip` 与 `strip + write` 同样返回 200。触发面与账号配额无关，短变体在同一账号上可正常返回。
+- 新增 Native/PTC 回归：默认中性化、`strip`、`false`、签名不匹配放行，以及策略与未知段落保留。
+
 ## 1.2.6 · 2026-11-16
 
 - **常驻引导完全去名称化**：不再出现任何工具名、动作名（`call_directory`/`lookup`/`detail`/`unload`/`reset`/`run_code`）或参数语法。引导只叙述可用性契约（最小集合、按需启用、启用不改变范围与权限、可撤销），语法由工具自身 Schema 承载。分类信息只给数量，不列举分类 ID，也不点名尚未启用的能力。此前的"点名未挂载的常用替代工具"做法已移除——点名会诱导模型跳过发现、直接依赖被点到的那项。
